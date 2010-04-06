@@ -10,7 +10,6 @@ import pycassa
 
 from .util import (unhandled_exception_handler,
                    BestDictAvailable,
-                   ObjWithFakeDictAndKey,
                    CrossModelCache,)
 from . import fields
 from . import connection
@@ -74,13 +73,6 @@ class Model(object):
         
     unhandled_exception_handler = staticmethod(unhandled_exception_handler)
 
-    def __getattr__(self, key):
-        return self.__dict__['columnstorage'][key]
-        
-    def __setattr__(self, key, value):
-        if not self.setIfPossible(self.__dict__['columnstorage'], key, value):
-            self.__dict__[key] = value
-
     @classmethod
     def verifyDataModel(cls):
         if cls.Meta.skipverify:
@@ -100,22 +92,25 @@ class Model(object):
                                                dict_class=BestDictAvailable)
         self.objects = pycassa.ColumnFamilyMap(self.__class__, self.Meta._cfamily)
 
-    def __init__(self, key=None, client=None, **kwargs):
-        self.__dict__['columnstorage'] = BestDictAvailable()
+    def __init__(self, *args, **kwargs):
+        key = kwargs.get('key')
+        client = kwargs.get('client')
+        self.columnstorage = BestDictAvailable()
         if client:
             self.Meta.client = client
             self.setManagerFromMeta()
-        self.__dict__['possiblekeys'] = set(self.objects.columns.keys())
+        self.possiblekeys = set(self.objects.columns.keys())
         self.key = key
-        self.update(kwargs)
+        self.update(args)
     
     def activecolumns(self, complain=False, reportbadmisses=False):
         columns = []
         failure = False
-        for name, value in self.objects.columns.items():
-            if name in self.__dict__['columnstorage'].keys():
+        columnmap = self.objects.columns
+        for name in self.columnstorage:
+            if name in columnmap:
                 columns.append(name)
-            elif not value.required:
+            elif not columnmap[name].required:
                 continue
             elif complain:
                 raise Exception("Row lacks required column '%s'." % name)
@@ -130,8 +125,10 @@ class Model(object):
                 raise Exception('Trying to save with undefined row key.')
         
         columns = self.activecolumns(complain=True)
-        fakedictproxy = ObjWithFakeDictAndKey(realdict=self.__dict__['columnstorage'], key=self.key)
-        self.objects.insert(instance=fakedictproxy, columns=columns)
+        insert_dict = BestDictAvailable()
+        for column in columns:
+            insert_dict[column] = self.objects.columns[column].pack(self.columnstorage[column])
+        self.objects.column_family.insert(self.key, insert_dict)
     
     def combine_columns(self, column_dict, columns):
         combined_columns = BestDictAvailable()
@@ -149,8 +146,12 @@ class Model(object):
         return combined_columns
     
     def load(self, column_count=10000):
-        rowkey, freshcolumns = (self.objects.column_family.get_range(start=self.key, finish=self.key,
-                               column_start='', column_finish='', column_reversed=False, column_count=column_count, row_count=1)).next()
+        self.columnstorage = BestDictAvailable()
+        try:
+            rowkey, freshcolumns = (self.objects.column_family.get_range(start=self.key, finish=self.key,
+                                   column_start='', column_finish='', column_reversed=False, column_count=column_count, row_count=1)).next()
+        except StopIteration:
+            raise Exception("Received zero answers to query.")
         assert self.key == rowkey, "Received different key %s than what I asked for (%s)" % (rowkey, self.key)
         columns = self.combine_columns(self.objects.columns, freshcolumns)
         self.update(columns)
@@ -162,23 +163,23 @@ class Model(object):
         else:
             return False
     
-    def update(self, arg=None, **kwargs):
+    def update(self, __magic_arg=None, **kwargs):
         work = BestDictAvailable()
         
-        if not (arg is None):
-            if hasattr(arg, 'keys'):
-                for key in arg:
-                    self.setIfPossible(work, key, arg[key])
-            elif 'arg' in possiblekeys:
-                setattr(self, 'arg', arg)
-            else:
-                for key, value in arg:
+        if not (__magic_arg is None):
+            if hasattr(__magic_arg, 'keys'):
+                for key in __magic_arg:
+                    self.setIfPossible(work, key, __magic_arg[key])
+            elif '__magic_arg' in self.possiblekeys:
+                setattr(self, '__magic_arg', __magic_arg)
+            else:                
+                for key, value in __magic_arg:                    
                     self.setIfPossible(work, key, value)
         
         for key, value in kwargs:
             self.setIfPossible(work, key, value)
         
-        self.__dict__['columnstorage'] = work
+        self.columnstorage = work
         columnmap = BestDictAvailable()
         for key in work:
             columnmap[key] = self.__class__.__dict__[key]
@@ -190,7 +191,7 @@ class Model(object):
         self.objects.columns = columnmap
 
     def __repr__(self):
-        nicerepr = BestDictAvailable((col, self.__dict__['columnstorage'].get(col)) for col in self.activecolumns())
+        nicerepr = BestDictAvailable((col, self.columnstorage.get(col)) for col in self.activecolumns())
         return '<%s(%s): %s>' % (
                 self.__class__.__name__,
                 self.key,
