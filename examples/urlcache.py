@@ -19,7 +19,8 @@ cachedurl.data = 'woot'
 cachedurl.save()
 print 'saved>', cachedurl
 
-empty = CachedURL(key='blah')
+empty = CachedURL(key='blah', data='bub', other='foo')
 print 'empty>', empty
+empty.save()
 empty.load()
 print 'full>', empty

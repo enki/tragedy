@@ -8,7 +8,17 @@ import types
 
 import pycassa
 
+from .util import (unhandled_exception_handler,
+                   BestDictAvailable,
+                   ObjWithFakeDictAndKey)
 from . import fields
+
+def create_instance(cls, **kwargs):
+    instance = cls()
+    instance.update(kwargs)
+    return instance
+
+pycassa.columnfamilymap.create_instance = create_instance
 
 class ModelType(type):
     def __new__(cls, name, bases, attrs):
@@ -46,58 +56,47 @@ class ModelType(type):
         
     def _setManagerFromMeta(cls):
         if cls.Meta.client:
-            cls.Meta._cfamily = pycassa.ColumnFamily(cls.Meta.client, cls.Meta.keyspace, cls.Meta.column_family)
+            cls.Meta._cfamily = pycassa.ColumnFamily(cls.Meta.client, cls.Meta.keyspace, cls.Meta.column_family,
+                                               dict_class=BestDictAvailable)
             cls.objects = pycassa.ColumnFamilyMap(cls, cls.Meta._cfamily)
-
-def unhandled_exception_handler():
-    tb = sys.exc_info()[2]
-    stack = []
-
-    while tb:
-        stack.append(tb.tb_frame)
-        tb = tb.tb_next
-
-    traceback.print_exc()
-
-    for frame in stack:
-            print
-            print "Frame %s in %s at line %s" % (frame.f_code.co_name,
-                                                 frame.f_code.co_filename,
-                                                 frame.f_lineno)
-            for key, value in frame.f_locals.items():
-                print "\t%20s = " % key,
-                try:                   
-                    print value
-                except:
-                    print "<ERROR WHILE PRINTING VALUE>"
 
 class Model(object):
     __metaclass__ = ModelType
-    
+        
     unhandled_exception_handler = staticmethod(unhandled_exception_handler)
 
+    def __getattr__(self, key):
+        return self.__dict__['columnstorage'][key]
+        
+    def __setattr__(self, key, value):
+        if not self.setIfPossible(self.__dict__['columnstorage'], key, value):
+            self.__dict__[key] = value
+            
     def setManagerFromMeta(self):
         """Override binding for instance."""
-        self.Meta._cfamily = pycassa.ColumnFamily(self.Meta.client, self.Meta.keyspace, self.Meta.column_family)
+        self.Meta._cfamily = pycassa.ColumnFamily(self.Meta.client, self.Meta.keyspace, self.Meta.column_family,
+                                               dict_class=BestDictAvailable)
         self.objects = pycassa.ColumnFamilyMap(self.__class__, self.Meta._cfamily)
 
-    def __init__(self, key=None, client=None):
+    def __init__(self, key=None, client=None, **kwargs):
+        self.__dict__['columnstorage'] = BestDictAvailable()
         if client:
             self.Meta.client = client
             self.setManagerFromMeta()
+        self.__dict__['possiblekeys'] = set(self.objects.columns.keys())
         self.key = key
-        self.possiblekeys = set(self.objects.columns.keys())
+        self.update(kwargs)
     
     def activecolumns(self, complain=False, reportbadmisses=False):
         columns = []
         failure = False
         for name, value in self.objects.columns.items():
-            if name in self.__dict__.keys():
+            if name in self.__dict__['columnstorage'].keys():
                 columns.append(name)
             elif not value.required:
                 continue
             elif complain:
-                raise Exception("Row lacks required column '%s'." % RowLacksRequiredColumn(name))
+                raise Exception("Row lacks required column '%s'." % name)
                 
         return columns
     
@@ -109,12 +108,11 @@ class Model(object):
                 raise Exception('Trying to save with undefined row key.')
         
         columns = self.activecolumns(complain=True)
-        self.objects.insert(instance=self, columns=columns)
+        fakedictproxy = ObjWithFakeDictAndKey(realdict=self.__dict__['columnstorage'], key=self.key)
+        self.objects.insert(instance=fakedictproxy, columns=columns)
     
     def combine_columns(self, column_dict, columns):
-        combined_columns = {}
-        for column, type in column_dict.iteritems():
-            combined_columns[column] = type.default
+        combined_columns = BestDictAvailable()
         for column, value in columns.iteritems():
             if column not in column_dict.keys():
                 try:
@@ -123,38 +121,56 @@ class Model(object):
                     self.unhandled_exception_handler()
                 continue
             combined_columns[column] = column_dict[column].unpack(value)
+        for column, coltype in column_dict.iteritems():
+            if column not in combined_columns.keys():
+                combined_columns[column] = coltype.default
         return combined_columns
     
-    def load(self):
+    def load(self, column_count=10000):
         rowkey, freshcolumns = (self.objects.column_family.get_range(start=self.key, finish=self.key,
-                               column_start='', column_finish='', column_count=1, row_count=1)).next()
+                               column_start='', column_finish='', column_reversed=False, column_count=column_count, row_count=1)).next()
         assert self.key == rowkey, "Received different key %s than what I asked for (%s)" % (rowkey, self.key)
         columns = self.combine_columns(self.objects.columns, freshcolumns)
         self.update(columns)
     
-    def setIfPossible(self, key, value):
+    def setIfPossible(self, work, key, value):
         if key in self.possiblekeys:
-            setattr(self, key, value)
+            work[key] = value
+            return True
         else:
-            warn(Exception("IMPOSSIBLE KEY FROM SERVER: %s: %s" % (key, value)))
+            return False
     
     def update(self, arg=None, **kwargs):
+        work = BestDictAvailable()
+        
         if not (arg is None):
             if hasattr(arg, 'keys'):
                 for key in arg:
-                    self.setIfPossible(key, arg[key])
+                    self.setIfPossible(work, key, arg[key])
             elif 'arg' in possiblekeys:
                 setattr(self, 'arg', arg)
             else:
                 for key, value in arg:
-                    self.setIfPossible(key, value)
+                    self.setIfPossible(work, key, value)
         
         for key, value in kwargs:
-            self.setIfPossible(key, value)
+            self.setIfPossible(work, key, value)
+        
+        self.__dict__['columnstorage'] = work
+        columnmap = BestDictAvailable()
+        for key in work:
+            columnmap[key] = self.__class__.__dict__[key]
+        
+        for key in self.objects.columns:
+            if key not in columnmap:
+                columnmap[key] = self.objects.columns[key]
+        
+        self.objects.columns = columnmap
 
     def __repr__(self):
+        nicerepr = BestDictAvailable((col, self.__dict__['columnstorage'].get(col)) for col in self.activecolumns())
         return '<%s(%s): %s>' % (
                 self.__class__.__name__,
                 self.key,
-                json.dumps( {col:getattr(self, col) for col in self.activecolumns()})
+                json.dumps(nicerepr )
         )
