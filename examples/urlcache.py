@@ -1,5 +1,3 @@
-import sys
-
 import tragedy
 tragedy.connect(['localhost:9160'])
 

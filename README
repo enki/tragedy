@@ -4,8 +4,6 @@ Tragedy is a thin layer on top of pycassa to make using Cassandra fun. - Work in
 Example:
 ----------
 
-import sys
-
 import tragedy
 tragedy.connect(['localhost:9160'])
 
