@@ -5,8 +5,10 @@ Example:
 ----------
 
 import sys
-import pycassa
-sys.modules['tragedyclient'] = pycassa.connect(['localhost:9160'])
+
+import tragedy
+tragedy.connect(['localhost:9160'])
+
 from tragedy.models import Model
 from tragedy import fields
 
@@ -22,9 +24,10 @@ class CachedURL(Model):
 cachedurl = CachedURL(key='blah')
 cachedurl.data = 'woot'
 cachedurl.save()
-print 'saved>', cachedurl # saved> <CachedURL(blah): {"data": "woot"}>
+print 'saved>', cachedurl
 
-empty = CachedURL(key='blah')
-print 'empty>', empty # empty> <CachedURL(blah): {}>
+empty = CachedURL(key='blah', data='bub', other='foo')
+print 'empty>', empty
+empty.save()
 empty.load()
-print 'full>', empty # full> <CachedURL(blah): {"other": null, "data": "woot"}>
+print 'full>', empty

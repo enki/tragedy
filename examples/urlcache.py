@@ -11,7 +11,6 @@ class CachedURL(Model):
         keyspace = 'BBQ'
         column_family = 'URLCache'
         generate_rowkey_if_empty = True # if no rowkey is specified, use UUID
-        client = None # use global instead
         
     data = fields.String()
     other = fields.String(required=False)
