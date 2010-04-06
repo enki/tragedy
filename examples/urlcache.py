@@ -1,6 +1,8 @@
 import sys
-import pycassa
-sys.modules['tragedyclient'] = pycassa.connect(['localhost:9160'])
+
+import tragedy
+tragedy.connect(['localhost:9160'])
+
 from tragedy.models import Model
 from tragedy import fields
 

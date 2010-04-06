@@ -1,6 +1,28 @@
 import sys
 import traceback
 import pycassa
+import threading
+
+class CrossModelCache(object):
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.storage = {}
+        
+    def store(self, key, value):
+        with self.lock:
+            self.storage[key] = value
+    
+    def retrieve(self, key):
+        with self.lock:
+            return self.storage.get(key)
+    
+    def retrieve_or_exec(self, func, *args, **kwargs):
+        signature = (func, tuple(args), tuple(kwargs.items()))
+        result = self.retrieve(signature)
+        if not result:
+            result = func(*args, **kwargs)
+            self.store(signature, result)
+        return result
 
 def unhandled_exception_handler(reraise=False):
     tb = sys.exc_info()[2]

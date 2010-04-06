@@ -10,8 +10,12 @@ import pycassa
 
 from .util import (unhandled_exception_handler,
                    BestDictAvailable,
-                   ObjWithFakeDictAndKey)
+                   ObjWithFakeDictAndKey,
+                   CrossModelCache,)
 from . import fields
+from . import connection
+
+cmcache = CrossModelCache()
 
 class ModelType(type):
     def __new__(cls, name, bases, attrs):
@@ -38,20 +42,32 @@ class ModelType(type):
         if keyspace is None:
             raise Exception("Class-Meta has no Keyspace.")
         
+        column_type = getattr(meta, 'column_type', 'Standard')
+        compare_with = getattr(meta, 'compare_with', 'BytesType')
+        
         column_family = getattr(meta, 'column_family', name)
         client = getattr(meta, 'client', None)
         if not client:
-            client = sys.modules.get('tragedyclient')
+            client = connection.client
         
         setattr(meta, 'keyspace', keyspace)
         setattr(meta, 'column_family', column_family)
+        setattr(meta, 'column_type', column_type)
+        setattr(meta, 'compare_with', compare_with)
         setattr(meta, 'client', client)
+        
+        skipverify = getattr(meta, 'skipverify', False)
+        setattr(meta, 'skipverify', skipverify)
+        
+        # Note: No support for supercolumns right now!
         
     def _setManagerFromMeta(cls):
         if cls.Meta.client:
             cls.Meta._cfamily = pycassa.ColumnFamily(cls.Meta.client, cls.Meta.keyspace, cls.Meta.column_family,
                                                dict_class=BestDictAvailable)
             cls.objects = pycassa.ColumnFamilyMap(cls, cls.Meta._cfamily)
+            
+            cls.verifyDataModel()
 
 class Model(object):
     __metaclass__ = ModelType
@@ -64,7 +80,20 @@ class Model(object):
     def __setattr__(self, key, value):
         if not self.setIfPossible(self.__dict__['columnstorage'], key, value):
             self.__dict__[key] = value
-            
+
+    @classmethod
+    def verifyDataModel(cls):
+        if cls.Meta.skipverify:
+            return
+        allkeyspaces = cmcache.retrieve_or_exec(cls.Meta.client.describe_keyspaces)
+        assert cls.Meta.keyspace in allkeyspaces, ("Cassandra doesn't know about " + 
+                                    "keyspace %s (only %s)" % (cls.Meta.keyspace, allkeyspaces))
+        mykeyspace = cmcache.retrieve_or_exec(cls.Meta.client.describe_keyspace, cls.Meta.keyspace)
+        mycf = mykeyspace[cls.Meta.column_family]
+        assert cls.Meta.column_type == mycf['Type'], 'Wrong column type (local %s, remote %s)' % (cls.Meta.column_type, mycf['Type'])
+        remotecw = mycf['CompareWith'].rsplit('.',1)[1]
+        assert cls.Meta.compare_with == remotecw, 'Wrong CompareWith (local %s, remote %s)' % (cls.Meta.compare_with, remotecw)
+
     def setManagerFromMeta(self):
         """Override binding for instance."""
         self.Meta._cfamily = pycassa.ColumnFamily(self.Meta.client, self.Meta.keyspace, self.Meta.column_family,
