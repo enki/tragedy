@@ -93,17 +93,18 @@ class Model(object):
         self.objects = pycassa.ColumnFamilyMap(self.__class__, self.Meta._cfamily)
 
     def __init__(self, *args, **kwargs):
-        key = kwargs.get('key')
-        client = kwargs.get('client')
+        key = kwargs.pop('key', None)
+        client = kwargs.pop('client', None)
+        
         self.columnstorage = BestDictAvailable()
         if client:
             self.Meta.client = client
             self.setManagerFromMeta()
         self.possiblekeys = set(self.objects.columns.keys())
         self.key = key
-        self.update(args)
+        self.update(args, **kwargs)
     
-    def activecolumns(self, complain=False, reportbadmisses=False):
+    def activecolumns(self, complain=False):
         columns = []
         failure = False
         columnmap = self.objects.columns
@@ -114,7 +115,11 @@ class Model(object):
                 continue
             elif complain:
                 raise Exception("Row lacks required column '%s'." % name)
-                
+        
+        for name, value in columnmap.items():
+            if (not name in self.columnstorage.keys()) and value.required and complain:
+                raise Exception("Row lacks required column '%s'." % name)
+        
         return columns
     
     def save(self):
@@ -165,7 +170,7 @@ class Model(object):
     
     def update(self, __magic_arg=None, **kwargs):
         work = BestDictAvailable()
-        
+
         if not (__magic_arg is None):
             if hasattr(__magic_arg, 'keys'):
                 for key in __magic_arg:
@@ -176,7 +181,7 @@ class Model(object):
                 for key, value in __magic_arg:                    
                     self.setIfPossible(work, key, value)
         
-        for key, value in kwargs:
+        for key, value in kwargs.items():
             self.setIfPossible(work, key, value)
         
         self.columnstorage = work
