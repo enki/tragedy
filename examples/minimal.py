@@ -1,9 +1,3 @@
-Tragedy is a thin layer on top of pycassa to make using Cassandra fun. - Work in Progress
-    Written by Paul Bohm <enki@bbq.io>.
-
-Example:
-----------
-
 import sys
 import pycassa
 sys.modules['tragedyclient'] = pycassa.connect(['localhost:9160'])

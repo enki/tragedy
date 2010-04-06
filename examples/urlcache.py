@@ -1,9 +1,3 @@
-Tragedy is a thin layer on top of pycassa to make using Cassandra fun. - Work in Progress
-    Written by Paul Bohm <enki@bbq.io>.
-
-Example:
-----------
-
 import sys
 import pycassa
 sys.modules['tragedyclient'] = pycassa.connect(['localhost:9160'])
@@ -15,6 +9,7 @@ class CachedURL(Model):
         keyspace = 'BBQ'
         column_family = 'URLCache'
         generate_rowkey_if_empty = True # if no rowkey is specified, use UUID
+        client = None # use global instead
         
     data = fields.String()
     other = fields.String(required=False)
@@ -22,9 +17,9 @@ class CachedURL(Model):
 cachedurl = CachedURL(key='blah')
 cachedurl.data = 'woot'
 cachedurl.save()
-print 'saved>', cachedurl # saved> <CachedURL(blah): {"data": "woot"}>
+print 'saved>', cachedurl
 
 empty = CachedURL(key='blah')
-print 'empty>', empty # empty> <CachedURL(blah): {}>
+print 'empty>', empty
 empty.load()
-print 'full>', empty # full> <CachedURL(blah): {"other": null, "data": "woot"}>
+print 'full>', empty
