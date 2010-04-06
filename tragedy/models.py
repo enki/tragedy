@@ -13,13 +13,6 @@ from .util import (unhandled_exception_handler,
                    ObjWithFakeDictAndKey)
 from . import fields
 
-def create_instance(cls, **kwargs):
-    instance = cls()
-    instance.update(kwargs)
-    return instance
-
-pycassa.columnfamilymap.create_instance = create_instance
-
 class ModelType(type):
     def __new__(cls, name, bases, attrs):
         parents = [b for b in bases if isinstance(b, ModelType)]

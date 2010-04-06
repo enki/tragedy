@@ -47,4 +47,10 @@ try:
 except:
     unhandled_exception_handler()
     BestDictAvailable = dict
-    
+
+def create_instance(cls, **kwargs):
+    instance = cls()
+    instance.update(kwargs)
+    return instance
+
+pycassa.columnfamilymap.create_instance = create_instance    
