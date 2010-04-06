@@ -1,5 +1,6 @@
 import sys
 import traceback
+import pycassa
 
 def unhandled_exception_handler(reraise=False):
     tb = sys.exc_info()[2]
