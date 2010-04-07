@@ -10,7 +10,10 @@ def gm_timestamp():
     return int(time.time() * 1e6)
 
 class RowDefaults(object):
-    default_transformer = None
+    default_transformer = None # stuff that gets written to the database
+                               # (also changes local state to stay in sync)
+                               # -> internal rep is database rep
+    default_sanitizer = None # userinput entering the system
     timestamp = staticmethod(gm_timestamp)
     read_consistency_level=ConsistencyLevel.ONE
     write_consistency_level=ConsistencyLevel.ONE
@@ -40,12 +43,18 @@ class BasicRow(RowDefaults):
     def sanityCheck_save(self):
         assert self.Meta.row_key_name in self.ordered_columnkeys.keys(), 'Need row_key specified somehow!'
     
+    def access_by_key_for_internal(self, columnkey):
+        """returns internal/database state!"""
+        transformer = self.column_spec.get(columnkey, self.default_transformer)
+        if transformer:
+            newvalue = transformer(columnkey, self.column_value.get(columnkey))
+            self.column_value[columnkey] = newvalue
+        
+        return self.column_value[columnkey]
+    
     def calc_kvpairs(self, filter_for_saving=False):
         for columnkey in self.ordered_columnkeys.keys():
-            transformer = self.column_spec.get(columnkey, self.default_transformer)
-            if transformer:
-                newvalue = transformer(columnkey, self.column_value.get(columnkey))
-                self.column_value[columnkey] = newvalue
+            self.access_by_key_for_internal(columnkey)
                             
             if self.column_value.get(columnkey) is None:
                 continue
@@ -54,7 +63,7 @@ class BasicRow(RowDefaults):
                         
             yield columnkey, self.column_value[columnkey]
        
-    def insert(self, write_consistency_level=None):
+    def save(self, write_consistency_level=None):
         self.sanityCheck_save()
         save_columns = []
         for columnkey, columnvalue in self.calc_kvpairs(filter_for_saving=True):
@@ -98,15 +107,26 @@ class BasicRow(RowDefaults):
         assert len(key_slices) == 1, 'we requested one row, but got more'
         result = key_slices[0]
         assert result.key == self.column_value[self.Meta.row_key_name]
+        result = [(colOrSuper.column.name, colOrSuper.column.value) for colOrSuper in result.columns]
+        self.update(result)
         return result
+
+    def update(self, *args, **kwargs):
+        tmp = OrderedDict()
+        tmp.update(*args, **kwargs)
+        for key, value in tmp.items():
+            self.ordered_columnkeys[key] = None
+            sanitizer = self.column_spec.get(key, self.default_sanitizer)
+            if sanitizer:
+                self.column_value[key] = sanitizer(key, value)
+            self.column_value[key] = value
     
-    def load(self, spec_for_new_column=None):
-        try:
-            rowkey, freshcolumns = (self.objects.column_family.get_range(start=self.key, finish=self.key,
-                                   column_start='', column_finish='', column_reversed=False, column_count=column_count, row_count=1)).next()
-        except StopIteration:
-            raise Exception("Received zero answers to query.")
-        assert self.key == rowkey, "Received different key %s than what I asked for (%s)" % (rowkey, self.key)
+    def __getitem__(self, columnkey):
+        return self.access_by_key_for_internal(columnkey)
+    
+    def __setitem__(self, columnkey, value):
+        self.update( [(columnkey, value)] )
     
     def __str__(self):
-        return repr(OrderedDict( (x,y) for (x,y) in self.calc_kvpairs()))
+        return '<{0}: {1}>'.format(self.__class__.__name__, repr(OrderedDict( (x,y) for (x,y) in 
+                    self.calc_kvpairs())))

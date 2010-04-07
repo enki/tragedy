@@ -9,24 +9,19 @@ class CachedURL(BasicRow):
         client = client
         row_key_name = 'uuid'
 
+class URLIndex(BasicRow):
+    class Meta:
+        keyspace = 'BBQ'
+        column_family = 'URLIndex'
+        client = client
+        row_key_name = 'url'
+
 cachedurl = CachedURL()
-cachedurl.ordered_columnkeys['uuid'] = None
-cachedurl.ordered_columnkeys['data'] = None
-cachedurl.ordered_columnkeys['hase'] = None
+cachedurl.update(uuid='ROWKEY', data='OHLALA') #hase='rabbit', viech='toll')
+cachedurl.save()
 
-cachedurl.column_value['uuid'] = 'bOOOO'
-cachedurl.column_value['data'] = 'C'
-cachedurl.column_value['hase'] = 'B'
+urlhistory = URLIndex()
+urlhistory['url'] = 'http://news.ycombinator.com/'
+urlhistory['WHOOOAH'] = cachedurl['uuid']
 
-cachedurl.insert()
-# print cachedurl
-
-foo = CachedURL()
-foo.ordered_columnkeys['uuid'] = None
-foo.column_value['uuid'] = 'bOOOO'
-for colOrSuper in foo.get_last_n_columns().columns:
-    column = colOrSuper.column
-    name = column.name
-    value = column.value
-    print name, value
-    # timestamp = column.timestamp
+print urlhistory

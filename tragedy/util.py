@@ -20,11 +20,28 @@ class CrossModelCache(object):
         signature = (func, tuple(args), tuple(kwargs.items()))
         result = self.retrieve(signature)
         if not result:
+            print 'MISS', signature
             result = func(*args, **kwargs)
             self.store(signature, result)
+        else:
+            print 'HIT', signature
         return result
 
+    def append(self, key, value):
+        with self.lock:
+            b = self.storage.get(key, [])
+            b.append(value)
+            self.storage[key] = b
+
+    def drop(self, *args):
+        with self.lock:
+            try:
+                del self.storage[args]
+            except:
+                pass
+
 def unhandled_exception_handler(reraise=False):
+    print '<<<<<<<<<<<<<<<<<<<'
     tb = sys.exc_info()[2]
     stack = []
 
@@ -48,6 +65,7 @@ def unhandled_exception_handler(reraise=False):
     
     if reraise:
         raise
+    print '>>>>>>>>>>>>>>>>'
 
 class ObjWithFakeDictAndKey(object):
     __slots__ = ['realdict', 'key']

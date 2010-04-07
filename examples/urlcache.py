@@ -1,28 +1,46 @@
+import time
 import tragedy
 tragedy.connect(['localhost:9160'])
 
-from tragedy.models import Model
-from tragedy.util import BestDictAvailable
+from tragedy.models import Model, cmcache, Cluster, Keyspace, Index
+from tragedy.util import BestDictAvailable, unhandled_exception_handler
 from tragedy import fields
+from tragedy import management
 
-class CachedURL(Model):        
+BBQCluster = Cluster(name='BBQ Cluster')
+BBQKeyspace = Keyspace(name='BBQ', cluster=BBQCluster)
+
+# class Image(Model):
+#     class Meta:
+#         keyspace = BBQKeyspace
+
+class URL(Model):        
     class Meta:
-        keyspace = 'BBQ'
-        column_family = 'URLCache'
-        generate_rowkey_if_empty = True # if no rowkey is specified, use UUID
+        keyspace = BBQKeyspace        
+        randomly_indexed = True
         
-    b = fields.String(required=False)
-    c = fields.String()
-    a = fields.String() # these get sorted by the database on insert
+    data = fields.String(required=False)
+    title = fields.String(required=False)
+    # images = fields.SetField()
 
-cachedurl = CachedURL(('b', 'one'),('c','two'),('a','three')) # kwargs also work, but don't preserve order
-cachedurl.save()
-print 'saved>', cachedurl
-cachedurl.load()
-print 'loaded>', cachedurl
+class URLIndex(Index):
+    class Meta:
+        target = URL        
 
-empty = CachedURL(key=None, a='bub', c='foo')
-print 'empty>', empty
-empty.save()
-empty.load()
-print 'full>', empty
+management.boot(BBQKeyspace)
+
+url = CachedURL(data='OHAI')
+url.save()
+print url
+
+# cachedurl = CachedURL(('b', 'one'),('c','two'),('a','three')) # kwargs also work, but don't preserve order
+# cachedurl.save()
+# print 'saved>', cachedurl
+# cachedurl.load()
+# print 'loaded>', cachedurl
+# 
+# empty = CachedURL(key=None, a='bub', c='foo')
+# print 'empty>', empty
+# empty.save()
+# empty.load()
+# print 'full>', empty

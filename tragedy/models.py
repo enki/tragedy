@@ -5,6 +5,7 @@ import simplejson as json
 import uuid
 import traceback
 import types
+from collections import OrderedDict
 
 import pycassa
 
@@ -15,6 +16,37 @@ from . import fields
 from . import connection
 
 cmcache = CrossModelCache()
+
+class Cluster(object):
+    def __init__(self, name):
+        self.keyspaces = BestDictAvailable()
+        self.name = name
+        cmcache.store('Cluster#{0}'.format(self.name), self)
+        cmcache.append('clusters', self)
+        
+    def registerKeyspace(self, name, kspc):
+        self.keyspaces[name] = kspc
+
+class Keyspace(object):
+    def __init__(self, name, cluster):
+        self.models = BestDictAvailable()
+        self.name = name
+        cmcache.store('Keyspace#{0}'.format(self.name), self)
+        cmcache.append('keyspaces', self)
+        cluster.registerKeyspace(self.name, self)
+    
+    def registerModel(self, name, model):
+        self.models[name] = model
+    
+    def innerConfig(self):
+        return '\n'.join( x.toConfigline() for x in self.models.values() )
+    
+    def verifyModels(self):
+        for model in self.models.values():
+            model.verifyDataModel()
+    
+    def __repr__(self):
+        return self.name
 
 class ModelType(type):
     def __new__(cls, name, bases, attrs):
@@ -32,6 +64,8 @@ class ModelType(type):
         new_cls._processMeta()
         new_cls._setManagerFromMeta()
         
+        cmcache.append('models', new_cls)
+        new_cls.Meta.keyspace.registerModel(name, new_cls)
         return new_cls
     
     def _processMeta(cls):
@@ -62,11 +96,54 @@ class ModelType(type):
         
     def _setManagerFromMeta(cls):
         if cls.Meta.client:
-            cls.Meta._cfamily = pycassa.ColumnFamily(cls.Meta.client, cls.Meta.keyspace, cls.Meta.column_family,
+            cls.Meta._cfamily = pycassa.ColumnFamily(cls.Meta.client, cls.Meta.keyspace.name, cls.Meta.column_family,
                                                dict_class=BestDictAvailable)
             cls.objects = pycassa.ColumnFamilyMap(cls, cls.Meta._cfamily)
-            
-            cls.verifyDataModel()
+
+def gm_timestamp():
+    return int(time.time() * 1e6) # UNIX epoch time in GMT
+
+class RowDefaults(object):
+    self.default_transformer = None
+    self.timestamp = gm_timestamp
+    self.read_consistency_level=ConsistencyLevel.ONE
+    self.write_consistency_level=ConsistencyLevel.ONE
+
+    def _wcl(self, alternative):
+        return alternative if alternative else self.read_consistency_level
+
+    def _rcl(self, alternative):
+        return alternative if alternative else self.read_consistency_level
+
+class Row(RowDefaults):
+    """A row has (keyspace, column_family, row_key_name) fixed already."""
+    def __init__(self):
+                
+        self.ordered_columnkeys = OrderedDict() # basically abused as OrderedSet
+        self.column_value    = {}  #
+        self.column_spec     = {}  # these have no order themselves, but the keys are the same as above
+        
+    def insert(self, write_consistency_level=None):
+        save_columns = []
+        for columnkey in self.ordered_columnkeys.keys():
+            transformer = self.column_spec.get(columnkey, self.default_transformer)
+            if transformer:
+                newvalue = transformer(columnkey, self.column_value.get(columnkey))
+                self.column_value[columnkey] = newvalue
+                                
+            if columnkey == self.Meta.row_key_name:
+                continue
+            if self.column_value.get(columnkey) is None:
+                continue
+                
+            column = Column(name=key, value=self.column_value[columnkey], timestamp=self.timestamp())
+            save_columns.append( ColumnOrSuperColumn(column=column) )
+                
+        self.client.batch_insert(keyspace         = self.Meta.keyspace,
+                                 key              = self.column_value[self.Meta.row_key_name],
+                                 cfmap            = {self.Meta.column_family: save_columns},
+                                 consistency_level= self._wcl(write_consistency_level),
+                                )
 
 class Model(object):
     __metaclass__ = ModelType
@@ -77,18 +154,24 @@ class Model(object):
     def verifyDataModel(cls):
         if cls.Meta.skipverify:
             return
-        allkeyspaces = cmcache.retrieve_or_exec(cls.Meta.client.describe_keyspaces)
-        assert cls.Meta.keyspace in allkeyspaces, ("Cassandra doesn't know about " + 
+        allkeyspaces = cls.Meta.client.describe_keyspaces()
+        assert cls.Meta.keyspace.name in allkeyspaces, ("Cassandra doesn't know about " + 
                                     "keyspace %s (only %s)" % (cls.Meta.keyspace, allkeyspaces))
-        mykeyspace = cmcache.retrieve_or_exec(cls.Meta.client.describe_keyspace, cls.Meta.keyspace)
+        mykeyspace = cls.Meta.client.describe_keyspace(cls.Meta.keyspace.name)
         mycf = mykeyspace[cls.Meta.column_family]
         assert cls.Meta.column_type == mycf['Type'], 'Wrong column type (local %s, remote %s)' % (cls.Meta.column_type, mycf['Type'])
         remotecw = mycf['CompareWith'].rsplit('.',1)[1]
         assert cls.Meta.compare_with == remotecw, 'Wrong CompareWith (local %s, remote %s)' % (cls.Meta.compare_with, remotecw)
 
+    @classmethod
+    def toConfigline(cls):
+        out = '<ColumnFamily Name="{name}" CompareWith="{compare_with}"/>'.format(
+                    name=cls.Meta.column_family, compare_with=cls.Meta.compare_with )
+        return out
+
     def setManagerFromMeta(self):
         """Override binding for instance."""
-        self.Meta._cfamily = pycassa.ColumnFamily(self.Meta.client, self.Meta.keyspace, self.Meta.column_family,
+        self.Meta._cfamily = pycassa.ColumnFamily(self.Meta.client, self.Meta.keyspace.name, self.Meta.column_family,
                                                dict_class=BestDictAvailable)
         self.objects = pycassa.ColumnFamilyMap(self.__class__, self.Meta._cfamily)
 
@@ -124,7 +207,7 @@ class Model(object):
     
     def save(self):
         if self.key is None:
-            if getattr(self.Meta, 'generate_rowkey_if_empty', False):
+            if getattr(self.Meta, 'randomly_indexed', False):
                 self.key = uuid.uuid4().hex
             else:
                 raise Exception('Trying to save with undefined row key.')
@@ -202,3 +285,9 @@ class Model(object):
                 self.key,
                 json.dumps(nicerepr )
         )
+
+class Index(objects):
+    __metaclass__ = ModelType
+    
+    def __init__(self, ):
+        
