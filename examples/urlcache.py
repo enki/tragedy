@@ -28,7 +28,7 @@ class URLIndex(IndexRow):
 boot(bbqkeyspace)
 
 cachedurl = CachedURL()
-cachedurl.update(uuid='ROWKEY', data='OHLALA') #hase='rabbit', viech='toll')
+cachedurl.update(uuid='ROWKEY', data='OHLALA', hase='rabbit', viech='toll')
 cachedurl.save()
 
 urlhistory = URLIndex('http://xkcd.com/')
