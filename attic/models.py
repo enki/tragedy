@@ -100,51 +100,6 @@ class ModelType(type):
                                                dict_class=BestDictAvailable)
             cls.objects = pycassa.ColumnFamilyMap(cls, cls.Meta._cfamily)
 
-def gm_timestamp():
-    return int(time.time() * 1e6) # UNIX epoch time in GMT
-
-class RowDefaults(object):
-    self.default_transformer = None
-    self.timestamp = gm_timestamp
-    self.read_consistency_level=ConsistencyLevel.ONE
-    self.write_consistency_level=ConsistencyLevel.ONE
-
-    def _wcl(self, alternative):
-        return alternative if alternative else self.read_consistency_level
-
-    def _rcl(self, alternative):
-        return alternative if alternative else self.read_consistency_level
-
-class Row(RowDefaults):
-    """A row has (keyspace, column_family, row_key_name) fixed already."""
-    def __init__(self):
-                
-        self.ordered_columnkeys = OrderedDict() # basically abused as OrderedSet
-        self.column_value    = {}  #
-        self.column_spec     = {}  # these have no order themselves, but the keys are the same as above
-        
-    def insert(self, write_consistency_level=None):
-        save_columns = []
-        for columnkey in self.ordered_columnkeys.keys():
-            transformer = self.column_spec.get(columnkey, self.default_transformer)
-            if transformer:
-                newvalue = transformer(columnkey, self.column_value.get(columnkey))
-                self.column_value[columnkey] = newvalue
-                                
-            if columnkey == self.Meta.row_key_name:
-                continue
-            if self.column_value.get(columnkey) is None:
-                continue
-                
-            column = Column(name=key, value=self.column_value[columnkey], timestamp=self.timestamp())
-            save_columns.append( ColumnOrSuperColumn(column=column) )
-                
-        self.client.batch_insert(keyspace         = self.Meta.keyspace,
-                                 key              = self.column_value[self.Meta.row_key_name],
-                                 cfmap            = {self.Meta.column_family: save_columns},
-                                 consistency_level= self._wcl(write_consistency_level),
-                                )
-
 class Model(object):
     __metaclass__ = ModelType
         

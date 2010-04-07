@@ -1,15 +1,16 @@
-import time
 import functools
 from collections import OrderedDict
 from cassandra.ttypes import (Column, ColumnOrSuperColumn, ColumnParent,
     ColumnPath, ConsistencyLevel, NotFoundException, SlicePredicate,
     SliceRange, SuperColumn)
 
-def gm_timestamp():
-    """int : UNIX epoch time in GMT"""
-    return int(time.time() * 1e6)
+from .util import gm_timestamp
+
+from hacks import InventoryType
 
 class RowDefaults(object):
+    """Abstract Helper"""
+    __metaclass__ = InventoryType
     default_transformer = None # stuff that gets written to the database
                                # (also changes local state to stay in sync)
                                # -> internal rep is database rep
@@ -17,7 +18,7 @@ class RowDefaults(object):
     timestamp = staticmethod(gm_timestamp)
     read_consistency_level=ConsistencyLevel.ONE
     write_consistency_level=ConsistencyLevel.ONE
-
+    
     def _wcl(self, alternative):
         return alternative if alternative else self.read_consistency_level
 
@@ -25,7 +26,7 @@ class RowDefaults(object):
         return alternative if alternative else self.read_consistency_level
 
 class BasicRow(RowDefaults):
-    """A row has (keyspace, column_family, row_key_name) fixed already."""
+    """Each sub-class represents exactly one ColumnFamily, and each instance exactly one Row."""
     def __init__(self):
         self.sanityCheck_init()
         # Storage
@@ -36,9 +37,8 @@ class BasicRow(RowDefaults):
     def sanityCheck_init(self):
         meta = getattr(self, 'Meta', False)
         assert meta, "Need to define Meta!"
-        assert getattr(meta, 'column_family', False), 'Need to define Meta.column_family'
-        assert getattr(meta, 'keyspace', False), 'Need to define Meta.keyspace'
-        assert getattr(meta, 'client', False), 'Need to define Meta.client'
+        for attr in ('column_family', 'keyspace', 'column_type', 'compare_with', 'client'):
+            assert getattr(meta, attr, False), 'Need to define Meta.{0}'.format(attr)
 
     def sanityCheck_save(self):
         assert self.Meta.row_key_name in self.ordered_columnkeys.keys(), 'Need row_key specified somehow!'
@@ -70,7 +70,7 @@ class BasicRow(RowDefaults):
             column = Column(name=columnkey, value=columnvalue, timestamp=self.timestamp())
             save_columns.append( ColumnOrSuperColumn(column=column) )
                 
-        self.Meta.client.batch_insert(keyspace         = self.Meta.keyspace,
+        self.Meta.client.batch_insert(keyspace         = str(self.Meta.keyspace),
                                  key              = self.column_value[self.Meta.row_key_name],
                                  cfmap            = {self.Meta.column_family: save_columns},
                                  consistency_level= self._wcl(write_consistency_level),
@@ -80,7 +80,7 @@ class BasicRow(RowDefaults):
     def partial_get_columns_from_one_row(self):
         column_parent = ColumnParent(column_family=self.Meta.column_family, super_column=None)
         func = functools.partial(self.Meta.client.get_range_slice, 
-                                 keyspace          = self.Meta.keyspace,
+                                 keyspace          = str(self.Meta.keyspace),
                                  column_parent     = column_parent,
                                  #predicate
                                  start_key         = self.column_value[self.Meta.row_key_name],
@@ -120,6 +120,9 @@ class BasicRow(RowDefaults):
             if sanitizer:
                 self.column_value[key] = sanitizer(key, value)
             self.column_value[key] = value
+    
+    def get_reference(self):
+        return self.access_by_key_for_internal(self.Meta.row_key_name)
     
     def __getitem__(self, columnkey):
         return self.access_by_key_for_internal(columnkey)

@@ -2,6 +2,11 @@ import sys
 import traceback
 import pycassa
 import threading
+import time
+
+def gm_timestamp():
+    """int : UNIX epoch time in GMT"""
+    return int(time.time() * 1e6)
 
 class CrossModelCache(object):
     def __init__(self):
@@ -89,9 +94,9 @@ except:
     unhandled_exception_handler()
     BestDictAvailable = dict
 
-def create_instance(cls, **kwargs):
-    instance = cls()
-    instance.update(kwargs)
-    return instance
-
-pycassa.columnfamilymap.create_instance = create_instance    
+# def create_instance(cls, **kwargs):
+#     instance = cls()
+#     instance.update(kwargs)
+#     return instance
+# 
+# pycassa.columnfamilymap.create_instance = create_instance    
