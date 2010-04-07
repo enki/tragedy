@@ -1,4 +1,4 @@
-Tragedy is a thin layer on top of pycassa to make using Cassandra fun. - Work in Progress
+Tragedy is a thin python layer to make your life with Cassandra fun.
     Written by Paul Bohm <enki@bbq.io>.
 
 Requires Python2.7.
