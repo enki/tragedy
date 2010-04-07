@@ -1,4 +1,5 @@
 import functools
+import uuid
 from collections import OrderedDict
 from cassandra.ttypes import (Column, ColumnOrSuperColumn, ColumnParent,
     ColumnPath, ConsistencyLevel, NotFoundException, SlicePredicate,
@@ -27,12 +28,17 @@ class RowDefaults(object):
 
 class BasicRow(RowDefaults):
     """Each sub-class represents exactly one ColumnFamily, and each instance exactly one Row."""
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.sanityCheck_init()
         # Storage
         self.ordered_columnkeys = OrderedDict() # basically abused as OrderedSet
         self.column_value    = {}  #
         self.column_spec     = {}  # these have no order themselves, but the keys are the same as above
+        
+        self.init(*args, **kwargs)
+    
+    def init(self, *args, **kwargs):
+        pass # Override me
     
     def sanityCheck_init(self):
         meta = getattr(self, 'Meta', False)
@@ -71,7 +77,7 @@ class BasicRow(RowDefaults):
             save_columns.append( ColumnOrSuperColumn(column=column) )
                 
         self.Meta.client.batch_insert(keyspace         = str(self.Meta.keyspace),
-                                 key              = self.column_value[self.Meta.row_key_name],
+                                 key              = self.get_key(),
                                  cfmap            = {self.Meta.column_family: save_columns},
                                  consistency_level= self._wcl(write_consistency_level),
                                 )
@@ -83,8 +89,8 @@ class BasicRow(RowDefaults):
                                  keyspace          = str(self.Meta.keyspace),
                                  column_parent     = column_parent,
                                  #predicate
-                                 start_key         = self.column_value[self.Meta.row_key_name],
-                                 finish_key        = self.column_value[self.Meta.row_key_name],
+                                 start_key         = self.get_key(),
+                                 finish_key        = self.get_key(),
                                  row_count         = 1,
                                  #consistency_level
                                 )
@@ -106,14 +112,15 @@ class BasicRow(RowDefaults):
             return None # empty
         assert len(key_slices) == 1, 'we requested one row, but got more'
         result = key_slices[0]
-        assert result.key == self.column_value[self.Meta.row_key_name]
+        assert result.key == self.get_key()
         result = [(colOrSuper.column.name, colOrSuper.column.value) for colOrSuper in result.columns]
-        self.update(result)
+        self._update(result)
         return result
 
-    def update(self, *args, **kwargs):
+    def _update(self, *args, **kwargs):
         tmp = OrderedDict()
         tmp.update(*args, **kwargs)
+        
         for key, value in tmp.items():
             self.ordered_columnkeys[key] = None
             sanitizer = self.column_spec.get(key, self.default_sanitizer)
@@ -121,15 +128,34 @@ class BasicRow(RowDefaults):
                 self.column_value[key] = sanitizer(key, value)
             self.column_value[key] = value
     
-    def get_reference(self):
+    def get_key(self):
         return self.access_by_key_for_internal(self.Meta.row_key_name)
     
+    def set_key(self, key):
+        self._update( [(self.Meta.row_key_name, key)] )
+    
+    def __str__(self):
+        return '<{0}: {1}>'.format(self.__class__.__name__, repr(OrderedDict( (x,y) for (x,y) in 
+                    self.calc_kvpairs())))
+
+class DictRow(BasicRow):
     def __getitem__(self, columnkey):
         return self.access_by_key_for_internal(columnkey)
     
     def __setitem__(self, columnkey, value):
         self.update( [(columnkey, value)] )
+
+    @property
+    def update(self):
+        return self._update
+
+class IndexRow(BasicRow):
+    def init(self, rowkey, *args, **kwargs):
+        self.set_key(rowkey) # and don't ever change it.
     
-    def __str__(self):
-        return '<{0}: {1}>'.format(self.__class__.__name__, repr(OrderedDict( (x,y) for (x,y) in 
-                    self.calc_kvpairs())))
+    def append(self, target):
+        if hasattr(target, 'get_key'):
+            target = target.get_key()
+        
+        newuuid = uuid.uuid1().bytes
+        self._update( [(newuuid, target)] )
