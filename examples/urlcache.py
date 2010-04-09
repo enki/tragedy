@@ -27,16 +27,15 @@ class URLIndex(IndexRow):
 
 boot(bbqkeyspace)
 
-cachedurl = CachedURL()
-cachedurl.update(uuid='ROWKEY', data='OHLALA', hase='rabbit', viech='toll')
+cachedurl = CachedURL(row_key='ROWKEY')
+cachedurl.update(data='OHLALA', hase='rabbit', viech='toll')
 cachedurl.save()
+print cachedurl
 
-urlhistory = URLIndex('http://xkcd.com/')
+urlhistory = URLIndex('http://xkcd.com/4')
 urlhistory.append(cachedurl)
-
 urlhistory.save()
-print urlhistory
 
-urlhistory = URLIndex('http://xkcd.com/')
+urlhistory = URLIndex('http://xkcd.com/4')
 urlhistory.get_last_n_columns()
 print urlhistory

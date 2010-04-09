@@ -3,6 +3,11 @@ import traceback
 import threading
 import time
 
+CASPATHSEP = ' -> '
+
+def warn(msg):
+    print 'WARN:', msg
+
 def gm_timestamp():
     """int : UNIX epoch time in GMT"""
     return int(time.time() * 1e6)

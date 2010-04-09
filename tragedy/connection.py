@@ -145,6 +145,8 @@ class SingleConnection(object):
                         self._client, self._transport = create_client_transport(server, self._framed_transport, self._timeout)
                         return getattr(self._client, attr)(*args, **kwargs)
                     except (Thrift.TException, socket.timeout, socket.error), exc:
+			import traceback
+			traceback.print_exc()
                         continue
                 self._client = None
                 raise NoServerAvailable()
