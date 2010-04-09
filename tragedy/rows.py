@@ -1,10 +1,12 @@
 import functools
 import uuid
-from collections import OrderedDict
 from cassandra.ttypes import (Column, ColumnOrSuperColumn, ColumnParent,
     ColumnPath, ConsistencyLevel, NotFoundException, SlicePredicate,
     SliceRange, SuperColumn)
 
+from .datastructures import (OrderedSet,
+                             OrderedDict,
+                            )
 from .util import gm_timestamp
 
 from hacks import InventoryType
@@ -31,7 +33,7 @@ class BasicRow(RowDefaults):
     def __init__(self, *args, **kwargs):
         self.sanityCheck_init()
         # Storage
-        self.ordered_columnkeys = OrderedDict() # basically abused as OrderedSet
+        self.ordered_columnkeys = OrderedSet()
         self.column_value    = {}  #
         self.column_spec     = {}  # these have no order themselves, but the keys are the same as above
         
@@ -47,7 +49,7 @@ class BasicRow(RowDefaults):
             assert getattr(meta, attr, False), 'Need to define Meta.{0}'.format(attr)
 
     def sanityCheck_save(self):
-        assert self.Meta.row_key_name in self.ordered_columnkeys.keys(), 'Need row_key specified somehow!'
+        assert self.Meta.row_key_name in self.ordered_columnkeys, 'Need row_key specified somehow!'
     
     def access_by_key_for_internal(self, columnkey):
         """returns internal/database state!"""
@@ -59,7 +61,7 @@ class BasicRow(RowDefaults):
         return self.column_value[columnkey]
     
     def calc_kvpairs(self, filter_for_saving=False):
-        for columnkey in self.ordered_columnkeys.keys():
+        for columnkey in self.ordered_columnkeys:
             self.access_by_key_for_internal(columnkey)
                             
             if self.column_value.get(columnkey) is None:
@@ -122,10 +124,10 @@ class BasicRow(RowDefaults):
         tmp.update(*args, **kwargs)
         
         for key, value in tmp.items():
-            self.ordered_columnkeys[key] = None
             sanitizer = self.column_spec.get(key, self.default_sanitizer)
             if sanitizer:
                 self.column_value[key] = sanitizer(key, value)
+            self.ordered_columnkeys.add(key)
             self.column_value[key] = value
     
     def get_key(self):
