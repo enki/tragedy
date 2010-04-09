@@ -1,3 +1,10 @@
+Tragedy is a thin python layer to make your life with Cassandra fun.
+    Written by Paul Bohm <enki@bbq.io>.
+
+Requires Python2.7.
+
+Example:
+
 import tragedy
 client = tragedy.connect(['localhost:9160'])
 from tragedy.hierarchy import Cluster, Keyspace
