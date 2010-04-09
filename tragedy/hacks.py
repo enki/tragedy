@@ -9,7 +9,17 @@ target = '/Users/enki/Projects/apache-cassandra-0.6.0-beta3/conf/storage-conf.xm
 pidfile = '/Users/enki/Projects/apache-cassandra-0.6.0-beta3/cassandra.pid'
 cassandrabin = '/Users/enki/Projects/apache-cassandra-0.6.0-beta3/bin/cassandra'
 
-def boot(keyspace):
+started = False
+want_boot = True
+
+def boot(keyspace=None):
+    global started
+    if started or not want_boot:
+        return
+    started = True
+    if not keyspace:
+        import hierarchy
+        keyspace = hierarchy.cmcache.retrieve('keyspaces')[0]
     success = False
     e = None
     try:
@@ -32,7 +42,8 @@ def boot(keyspace):
                 break
 
     if success:
-        print 'SUCCESSFULLY STARTED'
+        pass
+        # print 'SUCCESSFULLY STARTED'
     else:
         raise e
 

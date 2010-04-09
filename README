@@ -6,12 +6,12 @@ Requires Python2.7.
 New Syntax (work in progress):
 
 import tragedy
-client = tragedy.connect(['localhost:9160'])
 from tragedy.hierarchy import Cluster, Keyspace
 from tragedy.rows import BasicRow, DictRow, IndexRow
 from tragedy.columns import (BooleanColumnSpec,TimeUUIDColumnSpec)
 from tragedy.hacks import boot
 
+client = tragedy.connect(['localhost:9160'])
 bbqcluster = Cluster('BBQ Cluster')
 bbqkeyspace = Keyspace('BBQ', bbqcluster)
 

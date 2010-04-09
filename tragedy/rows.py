@@ -20,17 +20,31 @@ from .columns import (ColumnSpec,
                      MissingColumnSpec,
                     )
 
-class RowDefaults(object):
-    """Configuration Defaults for a BasicRow."""
-    __metaclass__ = InventoryType
-    
-    __abstract__ = True
-    _default_spec = MissingColumnSpec()
+from .hacks import boot
 
+class RowDefaults(object):
+    """Configuration Defaults for Rows."""
+    __metaclass__ = InventoryType # register with the inventory
+    __abstract__ = True # buy only if you are not __abstract__
+
+    # What we use for timestamps.
     timestamp = staticmethod(gm_timestamp)
+    
+    # We complain when there are attempts to set columns without spec.
+    _default_spec = MissingColumnSpec()
+    
+    # If our class configuration is incomplete, fill in defaults
+    _column_type = 'Standard'
+    _compare_with = 'BytesType'    
+    @classmethod
+    def _init_class(cls):
+        cls._column_family = getattr(cls, '_column_family', cls.__name__)
+        cls._keyspace = getattr(cls, '_keyspace', cmcache.retrieve('keyspaces')[0])
+        cls._client = getattr(cls, '_client', cmcache.retrieve('clients')[0])
+    
+    # Default Consistency levels that have overrides.
     read_consistency_level=ConsistencyLevel.ONE
     write_consistency_level=ConsistencyLevel.ONE
-    
     def _wcl(self, alternative):
         return alternative if alternative else self.read_consistency_level
 
@@ -41,42 +55,37 @@ class BasicRow(RowDefaults):
     """Each sub-class represents exactly one ColumnFamily, and each instance exactly one Row."""
     __abstract__ = True
 
-    _column_type = 'Standard'
-    _compare_with = 'BytesType'    
-    @classmethod
-    def _init_class(cls):
-        cls._column_family = getattr(cls, '_column_family', cls.__name__)
-        cls._keyspace = getattr(cls, '_keyspace', cmcache.retrieve('keyspaces')[0])
-        cls._client = getattr(cls, '_client', cmcache.retrieve('clients')[0])
-
-    def sanitycheck_init(self):
-        pass
+# ----- INIT -----
 
     def __init__(self, row_key=None, *args, **kwargs):
-        self.sanitycheck_init()
-        
+        # We're starting to go live - tell our hacks to check the db!
+        boot()
+
         # Storage
         self.ordered_columnkeys = OrderedSet()
         self.column_value    = {}  #
         self.column_spec     = {}  # these have no order themselves, but the keys are the same as above
         
+        # Our Row Key
         self.row_key = row_key
         
-        self.update_columnspecs()
+        # Extract the Columnspecs
+        self.extract_columnspecs_from_class()
         
         self.init(*args, **kwargs)
     
     def init(self, *args, **kwargs):
         pass # Override me
-    
-    def path(self, column_key=None):
-        p = u'%s%s%s' % (self._keyspace.path(), CASPATHSEP, self._column_family)
-        if self.row_key:
-            p += u'%s%s' % (CASPATHSEP,self.row_key)
-            if column_key:
-                p+= u'%s%s' % (CASPATHSEP, repr(column_key),)
-        return p
-    
+
+    def extract_columnspecs_from_class(self):
+        # Extract the columnspecs from this class
+        for attr, elem in itertools.chain(self.__class__.__dict__.iteritems(), self.__dict__.iteritems()):
+            if attr[0] == '_' or not isinstance(elem, ColumnSpec):
+                continue
+            self.column_spec[attr] = elem
+
+# ----- Access and convert data -----
+        
     def get_spec_for_columnkey(self, column_key):
         spec = self.column_spec.get(column_key)
         if not spec:
@@ -88,37 +97,40 @@ class BasicRow(RowDefaults):
     def get_value_for_columnkey(self, column_key):
         return self.column_value.get(column_key)
     
-    def update_columnspecs(self):
-        for attr, elem in itertools.chain(self.__class__.__dict__.iteritems(), self.__dict__.iteritems()):
-            if attr[0] == '_' or not isinstance(elem, ColumnSpec):
-                continue
-            self.column_spec[attr] = elem
-    
-    def yield_column_key_value_pairs(self, check_for_saving=False):
+    def yield_column_key_value_pairs(self, check_for_saving=False, **kwargs):
+        access_mode = kwargs.pop('access_mode', 'to_identity')
+        
         for name, spec in self.column_spec.items():
             if spec.required and not self.column_value.get(name):
                 raise Exception('Column %s of type %s required but missing.' % (name, spec))
+
         for column_key in self.ordered_columnkeys:
-            if self.get_value_for_columnkey(column_key) is None:
+            value = self.get_value_for_columnkey(column_key)
+            spec = self.get_spec_for_columnkey(column_key)
+            column_key, value = getattr(spec, access_mode)(column_key, value)
+            if value is None:
                 continue
-                                        
-            yield column_key, self.get_value_for_columnkey(column_key)
+            
+            yield column_key, value
 
-    def sanitycheck_save(self):
-        pass
+    def __iter__(self):
+        return self.yield_column_key_value_pairs(access_mode='to_external')
 
-    def save(self, write_consistency_level=None):
-        self.sanitycheck_save()
-        save_columns = []
-        for column_key, columnvalue in self.yield_column_key_value_pairs(check_for_saving=True):
-            column = Column(name=column_key, value=columnvalue, timestamp=self.timestamp())
-            save_columns.append( ColumnOrSuperColumn(column=column) )
-                
-        self._client.batch_insert(keyspace         = str(self._keyspace),
-                                 key              = self.row_key,
-                                 cfmap            = {self._column_family: save_columns},
-                                 consistency_level= self._wcl(write_consistency_level),
-                                )
+# ----- Change Data -----
+
+    def _update(self, *args, **kwargs):
+        access_mode = kwargs.pop('access_mode', 'to_identity')
+        
+        tmp = OrderedDict()
+        tmp.update(*args, **kwargs)
+        
+        for column_key, value in tmp.iteritems():
+            spec = self.column_spec.get(column_key, self._default_spec)
+            column_key, value = getattr(spec, access_mode)(column_key, value)
+            self.ordered_columnkeys.add(column_key)
+            self.column_value[column_key] = value
+
+# ----- Load Data -----
     
     @property
     def partial_get_columns_from_one_row(self):
@@ -134,15 +146,15 @@ class BasicRow(RowDefaults):
                                 )
         return func
     
-    def get_slice_predicate(self, column_names=None, start='', finish='', reverse=False, count=10000):
+    def get_slice_predicate(self, column_names=None, start='', finish='', reverse=True, count=10000):
         if column_names:
             return SlicePredicate(column_names=columns)
             
         slice_range = SliceRange(start=start, finish=finish, reversed=reverse, count=count)
         return SlicePredicate(slice_range=slice_range)
     
-    def get_last_n_columns(self, n=10000, consistency_level=None):
-        predicate = self.get_slice_predicate(count=n)
+    def get_last_n_columns(self, n=10000, consistency_level=None, **kwargs):
+        predicate = self.get_slice_predicate(count=n, **kwargs)
         key_slices = self.partial_get_columns_from_one_row(predicate=predicate,
                                                        consistency_level=self._rcl(consistency_level)
                                                       )
@@ -155,24 +167,38 @@ class BasicRow(RowDefaults):
         self._update(result)
         return result
 
-    def _update(self, *args, **kwargs):
-        access_mode = kwargs.pop('access_mode', 'to_identity')
-        
-        tmp = OrderedDict()
-        tmp.update(*args, **kwargs)
-        
-        for column_key, value in tmp.iteritems():
-            spec = self.column_spec.get(column_key, self._default_spec)
-            column_key, value = getattr(spec, access_mode)(column_key, value)
-            self.ordered_columnkeys.add(column_key)
-            self.column_value[column_key] = value
+# ----- Save Data -----
+
+    def save(self, write_consistency_level=None):
+        save_columns = []
+        for column_key, columnvalue in self.yield_column_key_value_pairs(check_for_saving=True):
+            column = Column(name=column_key, value=columnvalue, timestamp=self.timestamp())
+            save_columns.append( ColumnOrSuperColumn(column=column) )
+                
+        self._client.batch_insert(keyspace         = str(self._keyspace),
+                                 key              = self.row_key,
+                                 cfmap            = {self._column_family: save_columns},
+                                 consistency_level= self._wcl(write_consistency_level),
+                                )
+
+# ----- Display -----
         
     def __str__(self):
         return '<{0}: {1}>'.format(self.__class__.__name__, repr(OrderedDict( 
             self.get_spec_for_columnkey(column_key).to_display(column_key,value) for column_key,value in 
                     self.yield_column_key_value_pairs())))
 
+    def path(self, column_key=None):
+        """For now just a way to display our position in a kind of DOM."""
+        p = u'%s%s%s' % (self._keyspace.path(), CASPATHSEP, self._column_family)
+        if self.row_key:
+            p += u'%s%s' % (CASPATHSEP,self.row_key)
+            if column_key:
+                p+= u'%s%s' % (CASPATHSEP, repr(column_key),)
+        return p
+
 class DictRow(BasicRow):
+    """Row with a public dictionary interface to set and get columns."""
     __abstract__ = True
     
     def init(self, *args, **kwargs):
@@ -191,12 +217,12 @@ class DictRow(BasicRow):
         return functools.partial(self._update, access_mode='to_internal')
 
 class IndexRow(BasicRow):
+    """A row which doesn't care about column names, and that can be appended to."""
     __abstract__ = True
     _default_spec = IdentityColumnSpec(required=False)
     def append(self, target):
         if hasattr(target, 'row_key'):
             target = target.row_key
-        print 'append', target
             
         newuuid = uuid.uuid1().bytes
         self._update( [(newuuid, target)] )

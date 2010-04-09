@@ -16,8 +16,6 @@ class CachedURL(DictRow):
 class URLIndex(IndexRow):
     _default_spec = TimeUUIDColumnSpec(required=False)
     _compare_with = 'TimeUUIDType'
-    
-boot(bbqkeyspace)
 
 cachedurl = CachedURL(row_key='ROWKEY')
 cachedurl.update(data='OHLALA', hase='rabbit', viech='toll', mybool=False)
@@ -29,5 +27,6 @@ urlhistory.append(cachedurl)
 urlhistory.save()
 
 urlhistory = URLIndex('http://xkcd.com/5')
-urlhistory.get_last_n_columns()
-print urlhistory
+urlhistory.get_last_n_columns(n=4)
+for x in urlhistory:
+    print x
