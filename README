@@ -1,5 +1,6 @@
-Tragedy is a powerful python abstraction layer for Cassandra.
-While still under heavy development, it already has support for sorted indexes and foreign keys.
+Tragedy - A powerful python abstraction-layer for Cassandra.
+
+Now supports sorted indexes, model validation and foreign keys. Still work in progress.
 
 Example:
 
