@@ -1,17 +1,10 @@
-Tragedy is a thin python layer to make your life with Cassandra fun.
-    Written by Paul Bohm <enki@bbq.io>.
-
-Requires Python2.7.
-
-New Syntax (work in progress):
-
 import tragedy
+client = tragedy.connect(['localhost:9160'])
 from tragedy.hierarchy import Cluster, Keyspace
 from tragedy.rows import BasicRow, DictRow, IndexRow
 from tragedy.columns import (BooleanColumnSpec,TimeUUIDColumnSpec)
 from tragedy.hacks import boot
 
-client = tragedy.connect(['localhost:9160'])
 bbqcluster = Cluster('BBQ Cluster')
 bbqkeyspace = Keyspace('BBQ', bbqcluster)
 
@@ -23,8 +16,6 @@ class CachedURL(DictRow):
 class URLIndex(IndexRow):
     _default_spec = TimeUUIDColumnSpec(required=False)
     _compare_with = 'TimeUUIDType'
-    
-boot(bbqkeyspace)
 
 cachedurl = CachedURL(row_key='ROWKEY')
 cachedurl.update(data='OHLALA', hase='rabbit', viech='toll', mybool=False)
@@ -36,34 +27,6 @@ urlhistory.append(cachedurl)
 urlhistory.save()
 
 urlhistory = URLIndex('http://xkcd.com/5')
-urlhistory.get_last_n_columns()
-print urlhistory
-
-Old Example:
-------------
-
-import tragedy
-tragedy.connect(['localhost:9160'])
-
-from tragedy.models import Model
-from tragedy import fields
-
-class CachedURL(Model):        
-    class Meta:
-        keyspace = 'BBQ'
-        column_family = 'URLCache'
-        generate_rowkey_if_empty = True # if no rowkey is specified, use UUID
-        
-    data = fields.String()
-    other = fields.String(required=False)
-
-cachedurl = CachedURL(key='blah')
-cachedurl.data = 'woot'
-cachedurl.save()
-print 'saved>', cachedurl
-
-empty = CachedURL(key='blah', data='bub', other='foo')
-print 'empty>', empty
-empty.save()
-empty.load()
-print 'full>', empty
+urlhistory.get_last_n_columns(n=4)
+for x in urlhistory:
+    print x
