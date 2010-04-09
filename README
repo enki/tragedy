@@ -1,7 +1,5 @@
-Tragedy is a thin python layer to make your life with Cassandra fun.
-    Written by Paul Bohm <enki@bbq.io>.
-
-Requires Python2.7.
+Tragedy is a powerful python abstraction layer for Cassandra.
+While still under heavy development, it already has support for sorted indexes and foreign keys.
 
 Example:
 
