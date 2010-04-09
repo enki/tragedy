@@ -3,11 +3,9 @@ import uuid
 from . import timestamp
 
 class ColumnSpec(object):
-    implemented = False
-    def __init__(self):
-        if not self.implemented:
-            raise NotImplementedError()
-
+    def __init__(self, required=True):
+        self.required = required
+        
     def to_internal(self, column_key, value):
         return self.key_to_internal(column_key), self.value_to_internal(value)
 
@@ -21,10 +19,10 @@ class ColumnSpec(object):
         return self.key_to_display(column_key), self.value_to_display(value)
 
     def key_to_display(self, column_key): # called before displaying data
-        return column_key
+        return self.key_to_external(column_key)
 
     def value_to_display(self, value): # called before displaying data
-        return value
+        return self.value_to_external(value)
 
     def to_external(self, column_key, value):
         return self.key_to_external(column_key), self.value_to_external(value)
@@ -45,11 +43,9 @@ class ColumnSpec(object):
         return value
 
 class IdentityColumnSpec(ColumnSpec):
-    implemented = True
+    pass
 
 class TimeUUIDColumnSpec(ColumnSpec):
-    implemented = True
-    
     def key_to_display(self, column_key): # called before displaying data
         return time.ctime(timestamp.fromUUID(uuid.UUID(bytes=column_key)))
 
@@ -58,3 +54,16 @@ class TimeUUIDColumnSpec(ColumnSpec):
     
     def key_to_internal(self, column_key):
         return uuid.UUID(hex=column_key).bytes
+
+class MissingColumnSpec(ColumnSpec):
+    def key_to_internal(self, column_key):
+        raise Exception('No Specification for Key %s' % (column_key,))
+
+class BooleanColumnSpec(ColumnSpec):    
+    def value_to_external(self, value):
+        if value == True or value == "1":
+            return True
+        return False
+    
+    def value_to_internal(self, value):
+        return "1" if value else "0"

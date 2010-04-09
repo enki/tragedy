@@ -30,11 +30,11 @@ from thrift.transport import TSocket
 from thrift.protocol import TBinaryProtocol
 from cassandra import Cassandra
 
+from .hierarchy import cmcache
+
 __all__ = ['connect', 'connect_thread_local', 'NoServerAvailable']
 
 DEFAULT_SERVER = 'localhost:9160'
-
-client = None
 
 class NoServerAvailable(Exception):
     pass
@@ -80,11 +80,11 @@ def connect(servers=None, framed_transport=False, timeout=None):
     -------
     Cassandra client
     """
-    global client
 
     if servers is None:
         servers = [DEFAULT_SERVER]
     client = SingleConnection(servers, framed_transport, timeout)
+    cmcache.append('clients', client)
     return client
 
 def connect_thread_local(servers=None, round_robin=True, framed_transport=False, timeout=None):
