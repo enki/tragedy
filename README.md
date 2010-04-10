@@ -6,9 +6,6 @@ Tragedy is a powerful python abstraction-layer for Cassandra.
 
 Models, Indexes, Foreign Key Relationships, Server-Validation of Model
 
-## Status
-Stable, but not sufficiently packaged. (soon!)
-
 ## Example (twitter-demo)
 
 	import tragedy
