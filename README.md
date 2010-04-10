@@ -11,8 +11,8 @@ and Server-Validation of Models right out of the box.
 	client = tragedy.connect(['localhost:9160'])
 	from tragedy import *
 
-	bbqcluster = Cluster('BBQ Cluster')
-	bbqkeyspace = Keyspace('BBQ', bbqcluster)
+	twitty_cluster = Cluster('Twitter Cluster')
+	twitty_keyspace = Keyspace('Twitty', bbqcluster)
 
 	ALLTWEETS_KEY = '!ALLTWEETS!'
 

@@ -2,8 +2,8 @@ import tragedy
 client = tragedy.connect(['localhost:9160'])
 from tragedy import *
 
-bbqcluster = Cluster('BBQ Cluster')
-bbqkeyspace = Keyspace('BBQ', bbqcluster)
+twitty_cluster = Cluster('Twitty Cluster')
+twitty_keyspace = Keyspace('Twitty', twitty_cluster)
 
 ALLTWEETS_KEY = '!ALLTWEETS!'
 
