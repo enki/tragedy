@@ -66,7 +66,7 @@ class FollowedBy(Index):
     targetmodel = ForeignKey(foreign_class=User, compare_with='TimeUUIDType',
                              unique=True)
 
-# We're done with defining the API. Let's use it!
+# We're done with defining the Data Model. Let's use it!
 
 dave = User(username='dave', firstname='dave', password='test').save()
 merlin = User(username='merlin', firstname='merlin', password='sunshine').save()
