@@ -18,13 +18,11 @@ Out of the box it supports
 	twitty_cluster = Cluster('Twitty Cluster')
 	twitty_keyspace = Keyspace('Twitty', twitty_cluster)
 
-	ALLTWEETS_KEY = '!ALLTWEETS!'
+	ALLTWEETS_KEY = '!ALLTWEETS!' # virtual user that receives all tweets
 
 	class User(Model):
 	    """A Model is stored and retrieved by its RowKey.
-	       Every Model has exactly one RowKey and one or more other
-	       Fields (StringField, ForeignKey, BooleanField, ...).
-	    """
+	       Every Model has exactly one RowKey and one or more other Fields"""
 	    username = RowKey()
 	    firstname = StringField(required=False)
 	    lastname = StringField(required=False) # normally fields are mandatory
