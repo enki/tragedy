@@ -7,7 +7,7 @@ Out of the box it supports
     *    Time-Sorted-Indexes
     *    Mirroring
     *    Foreign Key Relationships
-    *    and server validation of models.
+    *    and Server-Validation of Models.
 
 ## Example (twitter-demo)
 
