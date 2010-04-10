@@ -2,7 +2,7 @@ import tragedy
 client = tragedy.connect(['localhost:9160'])
 from tragedy import *
 
-twitty_cluster = Cluster('Twitty Cluster')
+twitty_cluster  = Cluster('Twitty Cluster')
 twitty_keyspace = Keyspace('Twitty', twitty_cluster)
 
 ALLTWEETS_KEY = '!ALLTWEETS!' # virtual user that receives all tweets
@@ -10,18 +10,18 @@ ALLTWEETS_KEY = '!ALLTWEETS!' # virtual user that receives all tweets
 class User(Model):
     """A Model is stored and retrieved by its RowKey.
        Every Model has exactly one RowKey and one or more other Fields"""
-    username = RowKey()
+    username  = RowKey()
     firstname = StringField(required=False)
-    lastname = StringField(required=False) # normally fields are mandatory
-    password = StringField()
-    
+    lastname  = StringField(required=False) # normally fields are mandatory
+    password  = StringField()
+
     def follow(self, *one_or_more):
         fol = Following(username=self)
         for other in one_or_more:
             fol.append(other)
             FollowedBy(username=other).append(self).save()
         fol.save()
-    
+
     def tweet(self, message):
         new_tweet = Tweet(author=self, message=message[:140]).save()
         TweetsSent(by_username=self).append(new_tweet).save()
@@ -29,20 +29,20 @@ class User(Model):
         tr.append(new_tweet).save()
         for follower in self.get_followed_by():
             follower.receive(new_tweet)            
-    
+
     def receive(self, tweet):
         TweetsReceived(by_username=self).append(tweet).save()
-    
+
 class Tweet(Model):
-    uuid = RowKey(autogenerate=True) # generate a UUID for us.
+    uuid    = RowKey(autogenerate=True) # generate a UUID for us.
     message = StringField()    
-    author = ForeignKey(foreign_class=User, required=True)
+    author  = ForeignKey(foreign_class=User, required=True)
 
     @staticmethod
     def get_recent_tweets(*args, **kwargs):
         tr = TweetsReceived(by_username=ALLTWEETS_KEY)
         return tr.load(*args, **kwargs).loadIterValues()
-    
+
     def __repr__(self):
         return '<%s> %s' % (self['author']['username'], self['message'])
 
@@ -60,7 +60,7 @@ class Following(Index):
     username = RowKey(linked_from=User)
     targetmodel = ForeignKey(foreign_class=User, compare_with='TimeUUIDType', 
                              unique=True)    
-    
+
 class FollowedBy(Index):
     username = RowKey(linked_from=User)
     targetmodel = ForeignKey(foreign_class=User, compare_with='TimeUUIDType',

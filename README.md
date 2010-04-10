@@ -15,7 +15,7 @@ Out of the box it supports
 	client = tragedy.connect(['localhost:9160'])
 	from tragedy import *
 
-	twitty_cluster = Cluster('Twitty Cluster')
+	twitty_cluster  = Cluster('Twitty Cluster')
 	twitty_keyspace = Keyspace('Twitty', twitty_cluster)
 
 	ALLTWEETS_KEY = '!ALLTWEETS!' # virtual user that receives all tweets
@@ -23,10 +23,10 @@ Out of the box it supports
 	class User(Model):
 	    """A Model is stored and retrieved by its RowKey.
 	       Every Model has exactly one RowKey and one or more other Fields"""
-	    username = RowKey()
+	    username  = RowKey()
 	    firstname = StringField(required=False)
-	    lastname = StringField(required=False) # normally fields are mandatory
-	    password = StringField()
+	    lastname  = StringField(required=False) # normally fields are mandatory
+	    password  = StringField()
     
 	    def follow(self, *one_or_more):
 	        fol = Following(username=self)
@@ -47,9 +47,9 @@ Out of the box it supports
 	        TweetsReceived(by_username=self).append(tweet).save()
     
 	class Tweet(Model):
-	    uuid = RowKey(autogenerate=True) # generate a UUID for us.
+	    uuid    = RowKey(autogenerate=True) # generate a UUID for us.
 	    message = StringField()    
-	    author = ForeignKey(foreign_class=User, required=True)
+	    author  = ForeignKey(foreign_class=User, required=True)
 
 	    @staticmethod
 	    def get_recent_tweets(*args, **kwargs):
