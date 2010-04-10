@@ -30,6 +30,7 @@ from thrift.transport import TSocket
 from thrift.protocol import TBinaryProtocol
 from cassandra import Cassandra
 
+from .util import unhandled_exception_handler
 from .hierarchy import cmcache
 
 __all__ = ['connect', 'connect_thread_local', 'NoServerAvailable']
@@ -136,6 +137,7 @@ class SingleConnection(object):
             try:
                 return getattr(self._client, attr)(*args, **kwargs)
             except (Thrift.TException, socket.timeout, socket.error), exc:
+                unhandled_exception_handler()
                 # Connection error, try to connect to all the servers
                 self._transport.close()
                 self._client = None
@@ -145,11 +147,13 @@ class SingleConnection(object):
                         self._client, self._transport = create_client_transport(server, self._framed_transport, self._timeout)
                         return getattr(self._client, attr)(*args, **kwargs)
                     except (Thrift.TException, socket.timeout, socket.error), exc:
-			import traceback
-			traceback.print_exc()
+                        unhandled_exception_handler()
                         continue
                 self._client = None
                 raise NoServerAvailable()
+            except:
+                unhandled_exception_handler()
+                print args, kwargs
 
         setattr(self, attr, client_call)
         return getattr(self, attr)
@@ -160,6 +164,8 @@ class SingleConnection(object):
                 self._client, self._transport = create_client_transport(server, self._framed_transport, self._timeout)
                 return
             except (Thrift.TException, socket.timeout, socket.error), exc:
+                import traceback
+                traceback.print_exc()
                 continue
         self._client = None
         raise NoServerAvailable()

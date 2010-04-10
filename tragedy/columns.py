@@ -2,9 +2,9 @@ import time
 import uuid
 from . import timestamp
 
-class ColumnSpec(object):
-    def __init__(self, required=True):
-        self.required = required
+class ConvertAPI(object):
+    def __init__(self, *args, **kwargs):
+        self.required = kwargs.pop('required', True)
         
     def to_internal(self, column_key, value):
         return self.key_to_internal(column_key), self.value_to_internal(value)
@@ -42,7 +42,13 @@ class ColumnSpec(object):
     def value_to_identity(self, value): # don't modify
         return value
 
+class ColumnSpec(ConvertAPI):
+    pass
+
 class IdentityColumnSpec(ColumnSpec):
+    pass
+
+class StringColumnSpec(ColumnSpec):
     pass
 
 class TimeUUIDColumnSpec(ColumnSpec):
@@ -54,6 +60,26 @@ class TimeUUIDColumnSpec(ColumnSpec):
     
     def key_to_internal(self, column_key):
         return uuid.UUID(hex=column_key).bytes
+
+class ForeignKey(ColumnSpec):
+    def __init__(self, *args, **kwargs):
+        self.foreign_class = kwargs.pop('foreign_class')
+        self.resolve = kwargs.pop('resolve', False)
+        super(ForeignKey, self).__init__(self, *args, **kwargs)
+        
+    def value_to_external(self, row_key):
+        instance = self.foreign_class(row_key=row_key)
+        if self.resolve:
+            instance.multiget_slice()
+        return instance
+    
+    def value_to_internal(self, instance):
+        if hasattr(instance, 'row_key'):
+            return instance.row_key
+        return instance
+
+class TimeForeignKey(ForeignKey, TimeUUIDColumnSpec):
+    pass
 
 class MissingColumnSpec(ColumnSpec):
     def key_to_internal(self, column_key):

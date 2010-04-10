@@ -60,17 +60,17 @@ def unhandled_exception_handler(reraise=False):
 
     traceback.print_exc()
 
-    for frame in stack:
-            print
-            print "Frame %s in %s at line %s" % (frame.f_code.co_name,
-                                                 frame.f_code.co_filename,
-                                                 frame.f_lineno)
-            for key, value in frame.f_locals.items():
-                print "\t%20s = " % key,
-                try:                   
-                    print value
-                except:
-                    print "<ERROR WHILE PRINTING VALUE>"
+    # for frame in stack:
+    #         print
+    #         print "Frame %s in %s at line %s" % (frame.f_code.co_name,
+    #                                              frame.f_code.co_filename,
+    #                                              frame.f_lineno)
+    #         for key, value in frame.f_locals.items():
+    #             print "\t%20s = " % key,
+    #             try:                   
+    #                 print value
+    #             except:
+    #                 print "<ERROR WHILE PRINTING VALUE>"
     
     if reraise:
         raise

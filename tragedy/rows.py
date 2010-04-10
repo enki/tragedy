@@ -14,13 +14,71 @@ from .util import (gm_timestamp,
 from .hierarchy import (InventoryType,
                         cmcache,
                        )    
-from .columns import (ColumnSpec,
+from .columns import (ConvertAPI,
+                     ColumnSpec,
                      IdentityColumnSpec,
-                     TimeUUIDColumnSpec,
+                     ForeignKey,
                      MissingColumnSpec,
                     )
 
 from .hacks import boot
+
+class RowKey(ConvertAPI):
+    def __init__(self, *args, **kwargs):
+        self.autogenerate = kwargs.pop('autogenerate', False)
+        self.referenced_by = kwargs.pop('referenced_by', None)
+        self.by_funcname = kwargs.pop('by_funcname', None)
+        self.autoload_values = kwargs.pop('autoload_values', False)
+    
+    def value_to_internal(self, value):
+        if hasattr(value, 'row_key'):
+            value = value.row_key
+        
+        return value
+    
+    def prepare_referencing_class(self, cls, keyname):
+        if not self.referenced_by:
+            return
+        name = cls.__name__
+        
+        if not self.by_funcname:
+            fixedname = []
+            first = True
+            for c in name:
+                if first:
+                    fixedname.append( c.lower() )
+                    first = False
+                elif c.islower():
+                    fixedname.append(c)
+                elif c.isupper():
+                    fixedname.append('_' + c.lower())
+            fixedname = ''.join(fixedname)
+        else:
+            fixedname = None
+        
+        if self.autoload_values:
+            def acccess_function(self, *args, **kwargs):
+                myargs = {keyname: self}
+                ts = cls(**myargs).load(*args, **kwargs)
+                return ts.loadIterValues()
+        else:
+            def acccess_function(self, *args, **kwargs):
+                myargs = {keyname: self}
+                ts = cls(**myargs).load(*args, **kwargs)
+                return ts
+        
+        if isinstance(self.referenced_by, type):
+            rows = [self.referenced_by]
+        else:
+            rows = self.referenced_by
+        
+        if not self.by_funcname:
+            funcname = 'get_' + fixedname
+        else:
+            funcname = self.by_funcname
+            
+        for row in rows:
+            setattr(row, funcname, acccess_function)
 
 class RowDefaults(object):
     """Configuration Defaults for Rows."""
@@ -28,10 +86,14 @@ class RowDefaults(object):
     __abstract__ = True # buy only if you are not __abstract__
 
     # What we use for timestamps.
-    timestamp = staticmethod(gm_timestamp)
+    _timestamp_func = staticmethod(gm_timestamp)
     
     # We complain when there are attempts to set columns without spec.
-    _default_spec = MissingColumnSpec()
+    # default specs should normally never be required!
+    _default_spec = MissingColumnSpec(required=False)
+    
+    # we generally try to preserve order of columns, but this tells us it's ok not to occasionally.
+    _ordered = False
     
     # If our class configuration is incomplete, fill in defaults
     _column_type = 'Standard'
@@ -43,13 +105,16 @@ class RowDefaults(object):
         cls._client = getattr(cls, '_client', cmcache.retrieve('clients')[0])
     
     # Default Consistency levels that have overrides.
-    read_consistency_level=ConsistencyLevel.ONE
-    write_consistency_level=ConsistencyLevel.ONE
-    def _wcl(self, alternative):
-        return alternative if alternative else self.read_consistency_level
+    _read_consistency_level=ConsistencyLevel.ONE
+    _write_consistency_level=ConsistencyLevel.ONE
 
-    def _rcl(self, alternative):
-        return alternative if alternative else self.read_consistency_level
+    @classmethod
+    def _wcl(cls, alternative):
+        return alternative if alternative else cls._write_consistency_level
+
+    @classmethod
+    def _rcl(cls, alternative):
+        return alternative if alternative else cls._read_consistency_level
 
 class BasicRow(RowDefaults):
     """Each sub-class represents exactly one ColumnFamily, and each instance exactly one Row."""
@@ -57,35 +122,63 @@ class BasicRow(RowDefaults):
 
 # ----- INIT -----
 
-    def __init__(self, row_key=None, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         # We're starting to go live - tell our hacks to check the db!
         boot()
-
+        
         # Storage
         self.ordered_columnkeys = OrderedSet()
         self.column_value    = {}  #
-        self.column_spec     = {}  # these have no order themselves, but the keys are the same as above
+        self.column_changed  = {}  # these have no order themselves, but the keys are the same as above
+        self.column_spec     = {}  #
+        
+        self.indexes = OrderedSet()
+        self.mirrors = OrderedSet()
         
         # Our Row Key
-        self.row_key = row_key
+        self.row_key = kwargs.pop('row_key', None)
+        
+        self._row_key_name = None
+        self._row_key_spec = None
         
         # Extract the Columnspecs
-        self.extract_columnspecs_from_class()
+        self.extract_specs_from_class()
         
         self.init(*args, **kwargs)
     
     def init(self, *args, **kwargs):
-        pass # Override me
+        self._update(*args, **kwargs)
 
-    def extract_columnspecs_from_class(self):
+    def extract_specs_from_class(self):
         # Extract the columnspecs from this class
         for attr, elem in itertools.chain(self.__class__.__dict__.iteritems(), self.__dict__.iteritems()):
-            if attr[0] == '_' or not isinstance(elem, ColumnSpec):
+            if attr[0] == '_':
+                continue
+            elif isinstance(elem, RowKey):
+                self._row_key_name = attr
+                self._row_key_spec = elem
+                if self.row_key:
+                    self.row_key = self._row_key_spec.value_to_internal(self.row_key)
+                continue
+            elif not isinstance(elem, ColumnSpec):
                 continue
             self.column_spec[attr] = elem
+        
+        if not self._row_key_name:
+            raise Exception('need a name for the row key!')
 
 # ----- Access and convert data -----
-        
+    
+    # def __getattr__(self, column_key):
+    #     spec = self.get_spec_for_columnkey(column_key)
+    #     value = self.get_value_for_columnkey(column_key)
+    #     return spec.value_to_external(value)
+    # 
+    # def __setattr__(self, column_key, value):
+    #     spec = self.get_spec_for_columnkey(column_key)
+    #     internal_value = spec.value_to_internal(value)
+    #     return self.set_value_for_columnkey(columnkey, internal_value)
+    
     def get_spec_for_columnkey(self, column_key):
         spec = self.column_spec.get(column_key)
         if not spec:
@@ -95,18 +188,28 @@ class BasicRow(RowDefaults):
         return spec
     
     def get_value_for_columnkey(self, column_key):
+        if column_key == self._row_key_name:
+            return self.row_key
         return self.column_value.get(column_key)
+
+    def set_value_for_columnkey(self, column_key, value):
+        self.ordered_columnkeys.add(column_key)
+        self.column_value[column_key] = value
     
-    def yield_column_key_value_pairs(self, check_for_saving=False, **kwargs):
+    def yield_column_key_value_pairs(self, only_warn_about_required=False, **kwargs):
         access_mode = kwargs.pop('access_mode', 'to_identity')
         
-        for name, spec in self.column_spec.items():
-            if spec.required and not self.column_value.get(name):
-                raise Exception('Column %s of type %s required but missing.' % (name, spec))
+        missing_cols = OrderedSet()
+        for column_key, spec in self.column_spec.items():
+            if spec.required and not self.column_value.get(column_key):
+                if only_warn_about_required:
+                    yield getattr(spec, 'key_' + access_mode)(column_key) , '#MISSING#'
+                else:
+                    raise Exception("Column '%s' of type '%s' required but missing." % (column_key, spec))
 
         for column_key in self.ordered_columnkeys:
+            spec = self.get_spec_for_columnkey(column_key)            
             value = self.get_value_for_columnkey(column_key)
-            spec = self.get_spec_for_columnkey(column_key)
             column_key, value = getattr(spec, access_mode)(column_key, value)
             if value is None:
                 continue
@@ -116,77 +219,155 @@ class BasicRow(RowDefaults):
     def __iter__(self):
         return self.yield_column_key_value_pairs(access_mode='to_external')
 
+    def keys(self):
+        return self.ordered_columnkeys
+
+    def values(self):
+        return [self.column_value[x] for x in self.ordered_columnkeys]
+
+    def iterkeys(self):
+        return ( (x, self.column_value[x]) for x in self.ordered_columnkeys)
+    
+    def itervalues(self):
+        return (self.column_value[x] for x in self.ordered_columnkeys)
+
 # ----- Change Data -----
 
-    def _update(self, *args, **kwargs):
+    def _update(self, *args, **kwargs):        
         access_mode = kwargs.pop('access_mode', 'to_identity')
         
         tmp = OrderedDict()
         tmp.update(*args, **kwargs)
         
         for column_key, value in tmp.iteritems():
+            if column_key == self._row_key_name:
+                self.row_key = self._row_key_spec.value_to_internal(value)
+                continue
             spec = self.column_spec.get(column_key, self._default_spec)
             column_key, value = getattr(spec, access_mode)(column_key, value)
-            self.ordered_columnkeys.add(column_key)
-            self.column_value[column_key] = value
+            self.set_value_for_columnkey(column_key, value)
+            self.markChanged(column_key)
+
+    def markChanged(self, column_key):
+        self.column_changed[column_key] = True
+
+    def delete(self, column_key):
+        # XXX: keep track of delete
+        # XXX: can't delete if default columnspec is 'required'.
+        spec = self.get_spec_for_columnkey(column_key)
+        if spec.required:
+            raise 'Trying to delete required column %s' % (column_key,)
+        del self.column_value[column_key]
 
 # ----- Load Data -----
+
+    @classmethod
+    def column_parent(cls):
+        return ColumnParent(column_family=cls._column_family, super_column=None)
     
     @property
-    def partial_get_columns_from_one_row(self):
-        column_parent = ColumnParent(column_family=self._column_family, super_column=None)
-        func = functools.partial(self._client.get_range_slice, 
-                                 keyspace          = str(self._keyspace),
-                                 column_parent     = column_parent,
-                                 #predicate
-                                 start_key         = self.row_key,
-                                 finish_key        = self.row_key,
-                                 row_count         = 1,
-                                 #consistency_level
-                                )
-        return func
+    def query_defaults(self):
+        d = dict( keyspace          = str(self._keyspace),
+                  column_parent     = self.column_parent,
+                )
+        return d
     
-    def get_slice_predicate(self, column_names=None, start='', finish='', reverse=True, count=10000):
+    @staticmethod
+    def get_slice_predicate(column_names=None, start='', finish='', reverse=True, count=10000, *args, **kwargs):
         if column_names:
             return SlicePredicate(column_names=columns)
             
         slice_range = SliceRange(start=start, finish=finish, reversed=reverse, count=count)
         return SlicePredicate(slice_range=slice_range)
     
-    def get_last_n_columns(self, n=10000, consistency_level=None, **kwargs):
-        predicate = self.get_slice_predicate(count=n, **kwargs)
-        key_slices = self.partial_get_columns_from_one_row(predicate=predicate,
-                                                       consistency_level=self._rcl(consistency_level)
-                                                      )
-        if not key_slices:
-            return None # empty
-        assert len(key_slices) == 1, 'we requested one row, but got more'
-        result = key_slices[0]
-        assert result.key == self.row_key
-        result = [(colOrSuper.column.name, colOrSuper.column.value) for colOrSuper in result.columns]
-        self._update(result)
-        return result
+    @staticmethod
+    def decodeColumn(colOrSuper):
+        return (colOrSuper.column.name, colOrSuper.column.value)
+        
+    @classmethod
+    def load_multi(cls, ordered=True, *args, **kwargs):
+        unordered = {}
+        for row_key, columns in cls.multiget_slice(*args, **kwargs):
+            columns = OrderedDict(columns)
+            columns['row_key'] = row_key
+            if not ordered:
+                yield cls( **columns )
+            else:
+                unordered[row_key] = columns
+        
+        if not ordered:
+            raise StopIteration
+            
+        for row_key in kwargs['keys']:
+            yield cls( **unordered[row_key] )
+    
+    def load(self, *args, **kwargs):
+        assert self.row_key, 'No row_key and no non-null non-empty keys argument.'
+        tkeys = [self.row_key]
+        
+        data = list(self.multiget_slice(keys=tkeys, *args, **kwargs))
+        assert len(data) == 1
+        self._update(data[0][1])
+        # return data[0][1]
+        return self
+        
+    @classmethod
+    def multiget_slice(cls, keys=None, consistency_level=None, **kwargs):
+        assert keys, 'Need a non-null non-empty keys argument.'
+        predicate = cls.get_slice_predicate(**kwargs)
+        key_slices = cls._client.multiget_slice(      keyspace          = str(cls._keyspace),
+                                                      keys              = keys,
+                                                      column_parent     = cls.column_parent(),
+                                                      predicate         = predicate,
+                                                      consistency_level=cls._rcl(consistency_level),
+                                                     )
+        for row_key, columns in key_slices.iteritems():
+            yield row_key, [cls.decodeColumn(col) for col in columns]
+        #     key, value = result[0], [(colOrSuper.column.name, colOrSuper.column.value) for \
+        #                         colOrSuper in result[1]]
+        #     yield key, value
 
 # ----- Save Data -----
+    def generate_row_key(self):
+        self.row_key = uuid.uuid4().hex
 
-    def save(self, write_consistency_level=None):
+    def save(self, *args, **kwargs):
+        if not kwargs.get('write_consistency_level'):
+            kwargs['write_consistency_level'] = None
+        
+        if not self.row_key:
+            if self._row_key_spec.autogenerate:
+                self.generate_row_key()
+            else:
+                raise Exception('No row_key set!')
+        
+        for save_row_key in itertools.chain((self.row_key,), self.mirrors):
+            self._real_save(save_row_key=save_row_key, *args, **kwargs)
+        
+        return self
+        
+    def _real_save(self, save_row_key=None, *args, **kwargs):
         save_columns = []
-        for column_key, columnvalue in self.yield_column_key_value_pairs(check_for_saving=True):
-            column = Column(name=column_key, value=columnvalue, timestamp=self.timestamp())
+        for column_key, value in self.yield_column_key_value_pairs(check_for_saving=True):
+            column = Column(name=column_key, value=value, timestamp=self._timestamp_func())
             save_columns.append( ColumnOrSuperColumn(column=column) )
                 
         self._client.batch_insert(keyspace         = str(self._keyspace),
-                                 key              = self.row_key,
+                                 key              = save_row_key,
                                  cfmap            = {self._column_family: save_columns},
-                                 consistency_level= self._wcl(write_consistency_level),
+                                 consistency_level= self._wcl(kwargs['write_consistency_level']),
                                 )
+        
+        # reset 'changed' - nothing's changed anymore
+        self.column_changed.clear()
 
 # ----- Display -----
         
-    def __str__(self):
-        return '<{0}: {1}>'.format(self.__class__.__name__, repr(OrderedDict( 
+    def __repr__(self):
+        dtype = OrderedDict if self._ordered else dict
+        return '<{0} {1}: {2}>'.format(self.__class__.__name__, self.row_key, repr(dtype( 
             self.get_spec_for_columnkey(column_key).to_display(column_key,value) for column_key,value in 
-                    self.yield_column_key_value_pairs())))
+                    self.yield_column_key_value_pairs(only_warn_about_required=True))))
 
     def path(self, column_key=None):
         """For now just a way to display our position in a kind of DOM."""
@@ -216,13 +397,44 @@ class DictRow(BasicRow):
     def update(self):
         return functools.partial(self._update, access_mode='to_internal')
 
-class IndexRow(BasicRow):
+class Index(BasicRow):
     """A row which doesn't care about column names, and that can be appended to."""
     __abstract__ = True
-    _default_spec = IdentityColumnSpec(required=False)
+    _default_spec = None #IdentityColumnSpec(required=False)
+    _ordered = True
     def append(self, target):
-        if hasattr(target, 'row_key'):
-            target = target.row_key
+        target = self._default_spec.value_to_internal(target)
             
         newuuid = uuid.uuid1().bytes
         self._update( [(newuuid, target)] )
+        
+        return self
+
+    def loadIterItems(self):
+        return itertools.izip(self.iterkeys(), self.loadIterValues())
+
+    def loadIterValues(self):
+        return self._default_spec.foreign_class.load_multi(keys=self.values(), orderdata=self.keys())
+
+    def __iter__(self):
+        for row_key in self.itervalues():
+            yield self._default_spec.foreign_class(row_key=row_key)
+
+class TimeSortedIndex(Index):
+    __abstract__ = True
+    _compare_with = 'TimeUUIDType'
+    
+class TimeSortedUniqueIndex(Index):
+    __abstract__ = True
+    _compare_with = 'TimeUUIDType'
+    
+    def append(self, target):
+        MAXCOUNT = 20000000
+        self.load(count=MAXCOUNT) # XXX: we will blow up here at some point
+                                  # i don't know where the real limit is yet.
+        assert len(self.column_value) < MAXCOUNT - 1, 'Too many keys to enforce sorted uniqueness!'
+        mytarget = self._default_spec.value_to_internal(target)
+        if mytarget in self.itervalues():
+            return self
+        else:
+            return super(TimeSortedUniqueIndex, self).append(target)

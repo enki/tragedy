@@ -1,8 +1,8 @@
 from .datastructures import (OrderedDict,)
 from .util import (CASPATHSEP,
-                   CrossModelCache
+                   CrossModelCache,
                   )
-                  
+
 cmcache = CrossModelCache()
 
 class InventoryType(type):
@@ -16,6 +16,12 @@ class InventoryType(type):
         new_cls._init_class()
         # Register us!
         new_cls._keyspace.registerRowClass(name, new_cls)
+        
+        from .rows import RowKey
+        
+        for key, value in new_cls.__dict__.items():
+            if isinstance(value, RowKey):
+                value.prepare_referencing_class(new_cls, key)
         
         return new_cls
 
