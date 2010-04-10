@@ -24,7 +24,8 @@ class User(DictRow):
     def tweet(self, message):
         newtweet = Tweet(author=self, message=message[:140]).save()
         TweetsSent(by_username=self).append(newtweet).save()
-        TweetsReceived(by_username=ALLTWEETS_KEY).append(newtweet).save()
+        tr = TweetsReceived(by_username=ALLTWEETS_KEY)
+        tr.append(newtweet).save()
         for follower in self.get_followed_by():
             follower.receive(newtweet)            
     
@@ -39,7 +40,8 @@ class Tweet(DictRow):
 
     @staticmethod
     def get_recent_tweets(*args, **kwargs):
-        return TweetsReceived(by_username=ALLTWEETS_KEY).load(*args, **kwargs).loadIterValues()
+        tr = TweetsReceived(by_username=ALLTWEETS_KEY)
+        return tr.load(*args, **kwargs).loadIterValues()
 
 class TweetsSent(TimeSortedIndex):
     _default_spec = TimeForeignKey(foreign_class=Tweet, required=False)
@@ -57,11 +59,16 @@ class FollowedBy(TimeSortedUniqueIndex):
     _default_spec = TimeForeignKey(foreign_class=User, required=False)
     username = RowKey(referenced_by=User)
 
-chuck = User(username='chuck', firstname='Chuck', password='gibson').save()
-peter = User(username='peter', firstname='Peter', password='secret').save()
-bob = User(username='bob', firstname='Bob', lastname='Peters', password='password').save()
-dave = User(username='dave', firstname='dave', password='test').save()
-merlin = User(username='merlin', firstname='merlin', password='sunshine').save()
+chuck = User(username='chuck', firstname='Chuck', 
+			 password='gibson').save()
+peter = User(username='peter', firstname='Peter', 
+			 password='secret').save()
+bob = User(username='bob', firstname='Bob', 
+		   lastname='Peters', password='password').save()
+dave = User(username='dave', firstname='dave',
+			password='test').save()
+merlin = User(username='merlin', firstname='merlin',
+		    password='sunshine').save()
 
 peter.follow(chuck)
 bob.follow(chuck, dave)
@@ -75,6 +82,9 @@ chuck.tweet('140 characters')
 dave.tweet('making breakfast')
 chuck.tweet('sitting at home being bored')
 
-print 'Chuck sent', [ (x['message'], x['author']['username']) for x in chuck.get_tweets_sent(count=5)]
-print 'Bob received', [x['message'] for x in bob.get_tweets_received(count=5)]
-print 'ALL RECENT TWEETS', [x['message'] for x in Tweet.get_recent_tweets(count=4)]
+print 'Chuck sent', [ (x['message'], x['author']['username']) 
+					for x in chuck.get_tweets_sent(count=5)]
+print 'Bob received', [x['message'] 
+					for x in bob.get_tweets_received(count=5)]
+print 'ALL RECENT TWEETS', [x['message'] 
+					for x in Tweet.get_recent_tweets(count=4)]
