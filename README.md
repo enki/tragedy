@@ -11,7 +11,6 @@ Example (twitter-demo):
 
 	ALLTWEETS_KEY = '!ALLTWEETS!'
 
-	<blockquote>
 	class User(DictRow):
 	    username = RowKey()
     
