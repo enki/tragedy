@@ -2,8 +2,12 @@
 
 Tragedy is a powerful python abstraction-layer for Cassandra.
 
-It supports Models, Time-Sorted-Indexes, Mirroring, Foreign Key Relationships,
-and Server-Validation of Models right out of the box.
+Out of the box it supports
+* Models
+* Time-Sorted-Indexes
+* Mirroring
+* Foreign Key Relationships
+* and server validation of models.
 
 ## Example (twitter-demo)
 
