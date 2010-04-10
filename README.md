@@ -1,6 +1,6 @@
 # Tragedy
 
-Tragedy is a powerful python abstraction-layer for Cassandra.
+Tragedy is a powerful Python abstraction-layer for Cassandra.
 
 Out of the box it supports
     *    Models
