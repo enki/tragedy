@@ -36,12 +36,12 @@ Out of the box it supports
 	        fol.save()
     
 	    def tweet(self, message):
-	        newtweet = Tweet(author=self, message=message[:140]).save()
-	        TweetsSent(by_username=self).append(newtweet).save()
+	        new_tweet = Tweet(author=self, message=message[:140]).save()
+	        TweetsSent(by_username=self).append(new_tweet).save()
 	        tr = TweetsReceived(by_username=ALLTWEETS_KEY)
-	        tr.append(newtweet).save()
+	        tr.append(new_tweet).save()
 	        for follower in self.get_followed_by():
-	            follower.receive(newtweet)            
+	            follower.receive(new_tweet)            
     
 	    def receive(self, tweet):
 	        TweetsReceived(by_username=self).append(tweet).save()
