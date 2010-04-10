@@ -56,7 +56,7 @@ def verifyDataModel(cls):
     mycf = mykeyspace[cls._column_family]
     assert cls._column_type == mycf['Type'], 'Wrong column type (local %s, remote %s)' % (cls._column_type, mycf['Type'])
     remotecw = mycf['CompareWith'].rsplit('.',1)[1]
-    assert cls._compare_with == remotecw, 'Wrong CompareWith (local %s, remote %s)' % (cls._compare_with, remotecw)
+    assert cls._default_field.compare_with == remotecw, 'Wrong CompareWith (local %s, remote %s)' % (cls._default_field.compare_with, remotecw)
 
 def verifyAll(keyspace):
     for cf in getattr(keyspace, 'rowclasses').values():
@@ -67,7 +67,7 @@ def genconfigsnippet(keyspace):
 
 def genconfiglinefor(cls):
     return '<ColumnFamily Name="{name}" CompareWith="{compare_with}"/>'.format(
-                name=cls._column_family, compare_with=cls._compare_with )
+                name=cls._column_family, compare_with=cls._default_field.compare_with )
 
 def replacePlaceholder(configstring):
     newconfig = open(template, 'r').read().replace('[[[PLACEHOLDER]]]', configstring)

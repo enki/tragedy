@@ -42,16 +42,16 @@ class ConvertAPI(object):
     def value_to_identity(self, value): # don't modify
         return value
 
-class ColumnSpec(ConvertAPI):
+class Field(ConvertAPI):
+    compare_with = 'BytesType'
+
+class IdentityField(Field):
     pass
 
-class IdentityColumnSpec(ColumnSpec):
+class StringField(Field):
     pass
 
-class StringColumnSpec(ColumnSpec):
-    pass
-
-class TimeUUIDColumnSpec(ColumnSpec):
+class TimeUUIDField(Field):
     def key_to_display(self, column_key): # called before displaying data
         return time.ctime(timestamp.fromUUID(uuid.UUID(bytes=column_key)))
 
@@ -61,10 +61,12 @@ class TimeUUIDColumnSpec(ColumnSpec):
     def key_to_internal(self, column_key):
         return uuid.UUID(hex=column_key).bytes
 
-class ForeignKey(ColumnSpec):
+class ForeignKey(Field):
     def __init__(self, *args, **kwargs):
         self.foreign_class = kwargs.pop('foreign_class')
         self.resolve = kwargs.pop('resolve', False)
+        self.compare_with = kwargs.pop('compare_with', 'BytesType')
+        self.unique = kwargs.pop('unique', False)
         super(ForeignKey, self).__init__(self, *args, **kwargs)
         
     def value_to_external(self, row_key):
@@ -78,14 +80,11 @@ class ForeignKey(ColumnSpec):
             return instance.row_key
         return instance
 
-class TimeForeignKey(ForeignKey, TimeUUIDColumnSpec):
-    pass
-
-class MissingColumnSpec(ColumnSpec):
+class MissingField(Field):
     def key_to_internal(self, column_key):
         raise Exception('No Specification for Key %s' % (column_key,))
 
-class BooleanColumnSpec(ColumnSpec):    
+class BooleanField(Field):    
     def value_to_external(self, value):
         if value == True or value == "1":
             return True

@@ -17,11 +17,15 @@ class InventoryType(type):
         # Register us!
         new_cls._keyspace.registerRowClass(name, new_cls)
         
-        from .rows import RowKey
+        from .rows import RowKey, Index
         
         for key, value in new_cls.__dict__.items():
             if isinstance(value, RowKey):
                 value.prepare_referencing_class(new_cls, key)
+
+        if hasattr(new_cls, 'targetmodel'):
+            new_cls._default_field = new_cls.targetmodel
+
         
         return new_cls
 

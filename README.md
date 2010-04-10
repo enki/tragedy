@@ -15,17 +15,20 @@ Out of the box it supports
 	client = tragedy.connect(['localhost:9160'])
 	from tragedy import *
 
-	twitty_cluster = Cluster('Twitter Cluster')
-	twitty_keyspace = Keyspace('Twitty', bbqcluster)
+	twitty_cluster = Cluster('Twitty Cluster')
+	twitty_keyspace = Keyspace('Twitty', twitty_cluster)
 
 	ALLTWEETS_KEY = '!ALLTWEETS!'
 
-	class User(DictRow):
+	class User(Model):
+	    """A Model is stored and retrieved by its RowKey.
+	       Every Model has exactly one RowKey and one or more other
+	       Fields (StringField, ForeignKey, BooleanField, ...).
+	    """
 	    username = RowKey()
-    
-	    firstname = StringColumnSpec(required=False)
-	    lastname = StringColumnSpec(required=False)
-	    password = StringColumnSpec()
+	    firstname = StringField(required=False)
+	    lastname = StringField(required=False) # normally fields are mandatory
+	    password = StringField()
     
 	    def follow(self, *one_or_more):
 	        fol = Following(username=self)
@@ -45,59 +48,56 @@ Out of the box it supports
 	    def receive(self, tweet):
 	        TweetsReceived(by_username=self).append(tweet).save()
     
-	class Tweet(DictRow):
-	    uuid = RowKey(autogenerate=True)
-
-	    message = StringColumnSpec()
+	class Tweet(Model):
+	    uuid = RowKey(autogenerate=True) # generate a UUID for us.
+	    message = StringField()    
 	    author = ForeignKey(foreign_class=User, required=True)
 
 	    @staticmethod
 	    def get_recent_tweets(*args, **kwargs):
 	        tr = TweetsReceived(by_username=ALLTWEETS_KEY)
 	        return tr.load(*args, **kwargs).loadIterValues()
-
-	class TweetsSent(TimeSortedIndex):
-	    _default_spec = TimeForeignKey(foreign_class=Tweet, required=False)
-	    by_username = RowKey(referenced_by=User, autoload_values=True)
-
-	class TweetsReceived(TimeSortedIndex):
-	    _default_spec = TimeForeignKey(foreign_class=Tweet, required=False)
-	    by_username = RowKey(referenced_by=User, autoload_values=True)
-
-	class Following(TimeSortedUniqueIndex):
-	    _default_spec = TimeForeignKey(foreign_class=User, required=False)
-	    username = RowKey(referenced_by=User)
     
-	class FollowedBy(TimeSortedUniqueIndex):
-	    _default_spec = TimeForeignKey(foreign_class=User, required=False)
-	    username = RowKey(referenced_by=User)
+	    def __repr__(self):
+	        return '<%s> %s' % (self['author']['username'], self['message'])
 
-	chuck = User(username='chuck', firstname='Chuck', 
-				 password='gibson').save()
-	peter = User(username='peter', firstname='Peter', 
-				 password='secret').save()
-	bob = User(username='bob', firstname='Bob', 
-			   lastname='Peters', password='password').save()
-	dave = User(username='dave', firstname='dave',
-				password='test').save()
-	merlin = User(username='merlin', firstname='merlin',
-			    password='sunshine').save()
+	class TweetsSent(Index):
+	    """An index is an ordered mapping from one RowKey to
+	       many other Objects of a specific type."""
+	    by_username = RowKey(linked_from=User, autoload_values=True)
+	    targetmodel = ForeignKey(foreign_class=Tweet, compare_with='TimeUUIDType')
 
-	peter.follow(chuck)
-	bob.follow(chuck, dave)
-	dave.follow(chuck)
-	chuck.follow(bob)
-	merlin.follow(peter, dave)
+	class TweetsReceived(Index):
+	    by_username = RowKey(linked_from=User, autoload_values=True)
+	    targetmodel = ForeignKey(foreign_class=Tweet, compare_with='TimeUUIDType')
 
-	print 'Chuck has these followers:', chuck.get_followed_by().values()
-	print 'Bob follows', bob.get_following().values()
-	chuck.tweet('140 characters')
+	class Following(Index):
+	    username = RowKey(linked_from=User)
+	    targetmodel = ForeignKey(foreign_class=User, compare_with='TimeUUIDType', 
+	                             unique=True)    
+    
+	class FollowedBy(Index):
+	    username = RowKey(linked_from=User)
+	    targetmodel = ForeignKey(foreign_class=User, compare_with='TimeUUIDType',
+	                             unique=True)
+
+	# We're done with defining the API. Let's use it!
+
+	dave = User(username='dave', firstname='dave', password='test').save()
+	merlin = User(username='merlin', firstname='merlin', password='sunshine').save()
+	peter = User(username='peter', firstname='Peter', password='secret').save()
+
+	dave.follow(merlin, peter)
+	peter.follow(merlin)
+	merlin.follow(dave)
+
+	merlin.tweet("i've just started using twitty. send me a message!")
 	dave.tweet('making breakfast')
-	chuck.tweet('sitting at home being bored')
+	peter.tweet('sitting at home being bored')
 
-	print 'Chuck sent', [ (x['message'], x['author']['username']) 
-						for x in chuck.get_tweets_sent(count=5)]
-	print 'Bob received', [x['message'] 
-						for x in bob.get_tweets_received(count=5)]
-	print 'ALL RECENT TWEETS', [x['message'] 
-						for x in Tweet.get_recent_tweets(count=4)]
+	for dude in (dave,peter,merlin):
+	    name = dude['username']
+	    print '%s has these followers:' % (name,), dude.get_followed_by().values()
+	    print '%s follows' % (name,), dude.get_following().values()
+	    print '%s sent' % (name,), [x for x in dude.get_tweets_sent(count=5)]
+	    print '%s received' % (name,), [x for x in dude.get_tweets_received(count=5)]

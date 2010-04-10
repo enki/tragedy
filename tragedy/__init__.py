@@ -3,15 +3,11 @@ from .hierarchy import (Cluster,
                         Keyspace,
                        )
 from .rows import (RowKey,
-                   BasicRow,
-                   DictRow,
+                   Model,
                    Index,
-                   TimeSortedIndex,
-                   TimeSortedUniqueIndex,
                    )
-from .columns import (BooleanColumnSpec,
+from .columns import (BooleanField,
                       ForeignKey,
-                      StringColumnSpec,
-                      TimeForeignKey,
+                      StringField,
                      )
 from .hacks import boot

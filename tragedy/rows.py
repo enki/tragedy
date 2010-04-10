@@ -15,10 +15,10 @@ from .hierarchy import (InventoryType,
                         cmcache,
                        )    
 from .columns import (ConvertAPI,
-                     ColumnSpec,
-                     IdentityColumnSpec,
+                     Field,
+                     IdentityField,
                      ForeignKey,
-                     MissingColumnSpec,
+                     MissingField,
                     )
 
 from .hacks import boot
@@ -26,7 +26,7 @@ from .hacks import boot
 class RowKey(ConvertAPI):
     def __init__(self, *args, **kwargs):
         self.autogenerate = kwargs.pop('autogenerate', False)
-        self.referenced_by = kwargs.pop('referenced_by', None)
+        self.linked_from = kwargs.pop('linked_from', None)
         self.by_funcname = kwargs.pop('by_funcname', None)
         self.autoload_values = kwargs.pop('autoload_values', False)
     
@@ -37,7 +37,7 @@ class RowKey(ConvertAPI):
         return value
     
     def prepare_referencing_class(self, cls, keyname):
-        if not self.referenced_by:
+        if not self.linked_from:
             return
         name = cls.__name__
         
@@ -67,10 +67,10 @@ class RowKey(ConvertAPI):
                 ts = cls(**myargs).load(*args, **kwargs)
                 return ts
         
-        if isinstance(self.referenced_by, type):
-            rows = [self.referenced_by]
+        if isinstance(self.linked_from, type):
+            rows = [self.linked_from]
         else:
-            rows = self.referenced_by
+            rows = self.linked_from
         
         if not self.by_funcname:
             funcname = 'get_' + fixedname
@@ -90,14 +90,14 @@ class RowDefaults(object):
     
     # We complain when there are attempts to set columns without spec.
     # default specs should normally never be required!
-    _default_spec = MissingColumnSpec(required=False)
+    _default_field = MissingField(required=False)
     
     # we generally try to preserve order of columns, but this tells us it's ok not to occasionally.
     _ordered = False
     
     # If our class configuration is incomplete, fill in defaults
     _column_type = 'Standard'
-    _compare_with = 'BytesType'    
+
     @classmethod
     def _init_class(cls):
         cls._column_family = getattr(cls, '_column_family', cls.__name__)
@@ -160,7 +160,7 @@ class BasicRow(RowDefaults):
                 if self.row_key:
                     self.row_key = self._row_key_spec.value_to_internal(self.row_key)
                 continue
-            elif not isinstance(elem, ColumnSpec):
+            elif not isinstance(elem, Field):
                 continue
             self.column_spec[attr] = elem
         
@@ -184,7 +184,7 @@ class BasicRow(RowDefaults):
         if not spec:
             spec = getattr(self, column_key, None)
         if not spec:
-            spec = self._default_spec
+            spec = self._default_field
         return spec
     
     def get_value_for_columnkey(self, column_key):
@@ -204,7 +204,7 @@ class BasicRow(RowDefaults):
             if spec.required and not self.column_value.get(column_key):
                 if only_warn_about_required:
                     yield getattr(spec, 'key_' + access_mode)(column_key) , '#MISSING#'
-                else:
+                elif not hasattr(self, 'targetmodel'):
                     raise Exception("Column '%s' of type '%s' required but missing." % (column_key, spec))
 
         for column_key in self.ordered_columnkeys:
@@ -243,7 +243,7 @@ class BasicRow(RowDefaults):
             if column_key == self._row_key_name:
                 self.row_key = self._row_key_spec.value_to_internal(value)
                 continue
-            spec = self.column_spec.get(column_key, self._default_spec)
+            spec = self.column_spec.get(column_key, self._default_field)
             column_key, value = getattr(spec, access_mode)(column_key, value)
             self.set_value_for_columnkey(column_key, value)
             self.markChanged(column_key)
@@ -397,44 +397,59 @@ class DictRow(BasicRow):
     def update(self):
         return functools.partial(self._update, access_mode='to_internal')
 
+Model = DictRow
+
 class Index(BasicRow):
     """A row which doesn't care about column names, and that can be appended to."""
     __abstract__ = True
-    _default_spec = None #IdentityColumnSpec(required=False)
+    _default_field = None
     _ordered = True
+
+    def is_unique(self, target):
+        MAXCOUNT = 20000000
+        self.load(count=MAXCOUNT) # XXX: we will blow up here at some point
+                                  # i don't know where the real limit is yet.
+        assert len(self.column_value) < MAXCOUNT - 1, 'Too many keys to enforce sorted uniqueness!'
+        mytarget = self.targetmodel.value_to_internal(target)
+        if mytarget in self.itervalues():
+            return False
+        return True
+        
     def append(self, target):
-        target = self._default_spec.value_to_internal(target)
+        if self.targetmodel.unique and not self.is_unique(target):
+            return self
             
+        target = self.targetmodel.value_to_internal(target)
+
         newuuid = uuid.uuid1().bytes
         self._update( [(newuuid, target)] )
-        
         return self
 
     def loadIterItems(self):
         return itertools.izip(self.iterkeys(), self.loadIterValues())
 
     def loadIterValues(self):
-        return self._default_spec.foreign_class.load_multi(keys=self.values(), orderdata=self.keys())
+        return self.targetmodel.foreign_class.load_multi(keys=self.values(), orderdata=self.keys())
 
     def __iter__(self):
         for row_key in self.itervalues():
-            yield self._default_spec.foreign_class(row_key=row_key)
+            yield self.targetmodel.foreign_class(row_key=row_key)
 
-class TimeSortedIndex(Index):
-    __abstract__ = True
-    _compare_with = 'TimeUUIDType'
-    
-class TimeSortedUniqueIndex(Index):
-    __abstract__ = True
-    _compare_with = 'TimeUUIDType'
-    
-    def append(self, target):
-        MAXCOUNT = 20000000
-        self.load(count=MAXCOUNT) # XXX: we will blow up here at some point
-                                  # i don't know where the real limit is yet.
-        assert len(self.column_value) < MAXCOUNT - 1, 'Too many keys to enforce sorted uniqueness!'
-        mytarget = self._default_spec.value_to_internal(target)
-        if mytarget in self.itervalues():
-            return self
-        else:
-            return super(TimeSortedUniqueIndex, self).append(target)
+# class TimeSortedIndex(Index):
+#     __abstract__ = True
+#     _compare_with = 'TimeUUIDType'
+#     
+# class TimeSortedUniqueIndex(Index):
+#     __abstract__ = True
+#     _compare_with = 'TimeUUIDType'
+#     
+#     def append(self, target):
+#         MAXCOUNT = 20000000
+#         self.load(count=MAXCOUNT) # XXX: we will blow up here at some point
+#                                   # i don't know where the real limit is yet.
+#         assert len(self.column_value) < MAXCOUNT - 1, 'Too many keys to enforce sorted uniqueness!'
+#         mytarget = self._default_field.value_to_internal(target)
+#         if mytarget in self.itervalues():
+#             return self
+#         else:
+#             return super(Index, self).append(target)
