@@ -1,6 +1,15 @@
-Tragedy - A powerful python abstraction-layer for Cassandra.
+# Tragedy
 
-Example (twitter-demo):
+Tragedy is a powerful python abstraction-layer for Cassandra.
+
+## Features
+
+Models, Indexes, Foreign Key Relationships, Server-Validation of Model
+
+## Status
+Stable, but not sufficiently packaged. (soon!)
+
+## Example (twitter-demo)
 
 	import tragedy
 	client = tragedy.connect(['localhost:9160'])
