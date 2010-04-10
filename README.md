@@ -1,6 +1,6 @@
 Tragedy - A powerful python abstraction-layer for Cassandra.
 
-Example (full twissandra-style twitter implementation):
+Example (twitter-demo):
 
 	import tragedy
 	client = tragedy.connect(['localhost:9160'])
