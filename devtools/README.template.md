@@ -1,6 +1,6 @@
 # Tragedy
 
-Tragedy is a powerful Python abstraction-layer for Cassandra. 
+Tragedy is a high-level Cassandra abstraction-layer for Python.
 
 ## Tragedy's Data Model
 
@@ -48,5 +48,5 @@ Essentially Index.resolve() just calls Model.load() on each referenced Model, bu
 That's about it for the basics. There's more stuff like automatic validation if Cassandra and Tragedy agree on the DataModel. Take a look at the full example below:
 
 
-## Example (full twitty-demo)
+## Example (full twitter-demo)
 
