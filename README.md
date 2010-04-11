@@ -1,6 +1,6 @@
 # Tragedy
 
-Tragedy is a powerful Python abstraction-layer for Cassandra. 
+Tragedy is a high-level Cassandra abstraction-layer for Python.
 
 ## Tragedy's Data Model
 
@@ -41,14 +41,14 @@ To actually load the tweets we need to resolve them. Luckily that's easy:
 
 	tweets_by_user.resolve()
 	print tweets_by_user
-	[<Tweet ced314748d574379a817e1a1c9149789: {'message': "i've just started using twitty. send me a message!", 'author': <User merlin: {'password': '#MISSING#'}>}>
+	[<Tweet ced314748d574379a817e1a1c9149789: {'message': "some message", 'author': <User merlin: {'password': '#MISSING#'}>}>
 
 Essentially Index.resolve() just calls Model.load() on each referenced Model, but is actually more efficient because it combines the queries into a multiquery, that can be processed more efficiently. You can't call .resolve() on Models though, since their data has structure. (Data of Indexes is always only a sorted keys to Models or other Indexes).
 
 That's about it for the basics. There's more stuff like automatic validation if Cassandra and Tragedy agree on the DataModel. Take a look at the full example below:
 
 
-## Example (full twitty-demo)
+## Example (full twitter-demo)
 
     import tragedy
     client = tragedy.connect(['localhost:9160'])
