@@ -48,10 +48,10 @@ Behind the scenes Index.resolve() almost works like calling Model.load() on all 
 That's about it for the basics. There's more stuff Tragedy can do for you, and the following example shows of some of them, like automatic validation that Tragedy and Cassandra agree on the Data Model.
 
 ## Installation
-  XXX setup.py soon XXX
+  $ setup.py install   (optionally --cassandra to install the compiled cassandra thrift bindings)
 
-## IRC
-If you have questions catch me on IRC (enki on irc.freenode.net #cassandra), or send me an email to enki@bbq.io.
+## IRC and Contact
+Come hang out on #cassandra on irc.freenode.net. My email address is enki@bbq.io.
 
 ## Example (full twitter-demo)
 
