@@ -4,10 +4,13 @@ Tragedy is a high-level Cassandra abstraction for Python.
 
 ## Tragedy's Data Model
 
-To model your data in Tragedy, you define Models, Indexes and the relationships between them. A *Model* is a collection of data that can be accessed via a RowKey, and an *Index* is a 1-N mapping from one RowKey to one or more Models. A RowKey is just a unicode string. We usually use unique identifiers like usernames or email addresses for the RowKey. For Models that have no obvious unique identifier, we just let tragedy generate a UUID for us.
+In Tragedy you build your data model from Models and Indexes. An abstract *Model* specifies the kind data that can be stored in a Model-Instance. We also call a Model-Instance a Row, since specific Model-Instances are uniquely identified, and can only be retrieved and stored by their unique RowKey. The attributes of the Model correspond to the Columns of the Row. Each Column has a Field-Type like StringField or IntegerField. The RowKey decides which specific Row/Model-Instance the user is referring to and on which physical machine the data is stored. Any Unicode string can be used as RowKey as long as it is unique among all Rows of a Model. If there's no naturally unique identifier for the data in a Row, you can ask Tragedy to generate a UUID-RowKey for you.
 
-Here's an example:
+An *Index* is a special kind of Model with an unlimited number of Columns that all have the same Field-Type (usually ForeignKey). Indexes are used to map from one RowKey (e.g. an Username), to an ordered list of others (e.g. a list of Blogposts). The Index is accessed with a RowKey, and doesn't contain any data except for the ordered list of RowKeys to other Models.
 
+Since distributed datastores like Cassandra don't support queries other than retrieving Models by RowKey, you have to create your Indexes when you write your data. By carefully tying Models and Indexes together, you can build complex applications that can run on large datastore clusters without running into scalability problems.
+
+Here's a simple example:
 	class Tweet(Model):
     	uuid    = RowKey(autogenerate=True) # generate a UUID for us.
     	message = StringField()    
@@ -33,7 +36,7 @@ TweetsSent is an abstract Index over Tweets, sorted by Cassandra's TimeUUIDType.
     tweets_by_user = TweetsSent(by_username='merlin').load()
 	print tweets_by_user
 
-The main difference between Index's and Models is that Index's keep track of an unlimited amount of unnamed data of the same kind (normally ForeignKeys), whereas a Model keeps track of a limited number of data that can be any mixture of types. Indexes are most often used to to help us find Data whose RowKey we've forgotten. Models can refer to Indexes using ForeignKeys, and Indexes can refer to both Models and (less often)  other Indexes. However only to one specific Model or Index Type per Index. The call above gives us a list of Tweets previously posted by user 'merlin', with their RowKeys correctly set. Since the Index only contains references, the actual tweet data hasn't been loaded yet. If we tried to work with those tweets, we'd see #MISSING# fields:
+The main difference between Indexes and Models is that Indexes keep track of an unlimited amount of unnamed data of the same kind (normally ForeignKeys), whereas a Model keeps track of a limited number of data that can be any mixture of types. Indexes are most often used to to help us find Data whose RowKey we've forgotten. Models can refer to Indexes using ForeignKeys, and Indexes can refer to both Models and (less often)  other Indexes. However only to one specific Model or Index Type per Index. The call above gives us a list of Tweets previously posted by user 'merlin', with their RowKeys correctly set. Since the Index only contains references, the actual tweet data hasn't been loaded yet. If we tried to work with those tweets, we'd see #MISSING# fields:
 
     [<Tweet 8649a1ca4ab843b9afa6cc954908ac04: {'message': '#MISSING#', 'author': '#MISSING#'}, ...]
 
