@@ -68,17 +68,17 @@ class RowKey(ConvertAPI):
                 return ts
         
         if isinstance(self.linked_from, type):
-            rows = [self.linked_from]
+            models = [self.linked_from]
         else:
-            rows = self.linked_from
+            models = self.linked_from
         
         if not self.by_funcname:
             funcname = 'get_' + fixedname
         else:
             funcname = self.by_funcname
             
-        for row in rows:
-            setattr(row, funcname, acccess_function)
+        for model in models:
+            setattr(model, funcname, acccess_function)
 
 class RowDefaults(object):
     """Configuration Defaults for Rows."""
@@ -144,10 +144,11 @@ class BasicRow(RowDefaults):
         # Extract the Columnspecs
         self.extract_specs_from_class()
         
+        self._update(*args, **kwargs)
         self.init(*args, **kwargs)
     
     def init(self, *args, **kwargs):
-        self._update(*args, **kwargs)
+        pass
 
     def extract_specs_from_class(self):
         # Extract the columnspecs from this class
@@ -302,13 +303,16 @@ class BasicRow(RowDefaults):
             yield cls( **unordered[row_key] )
     
     def load(self, *args, **kwargs):
-        assert self.row_key, 'No row_key and no non-null non-empty keys argument.'
+        assert self.row_key, 'No row_key and no non-null non-empty keys argument. Did you use the right row_key_name?'
+        load_subkeys = kwargs.pop('load_subkeys', False)
         tkeys = [self.row_key]
         
         data = list(self.multiget_slice(keys=tkeys, *args, **kwargs))
         assert len(data) == 1
         self._update(data[0][1])
         # return data[0][1]
+        if load_subkeys:
+            return self.loadIterValues()
         return self
         
     @classmethod
@@ -430,6 +434,9 @@ class Index(BasicRow):
 
     def loadIterValues(self):
         return self.targetmodel.foreign_class.load_multi(keys=self.values(), orderdata=self.keys())
+
+    def resolve(self):
+        return self.loadIterValues()
 
     def __iter__(self):
         for row_key in self.itervalues():

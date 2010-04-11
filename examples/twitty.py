@@ -25,13 +25,27 @@ class User(Model):
     def tweet(self, message):
         new_tweet = Tweet(author=self, message=message[:140]).save()
         TweetsSent(by_username=self).append(new_tweet).save()
+        
         tr = TweetsReceived(by_username=ALLTWEETS_KEY)
         tr.append(new_tweet).save()
+        
         for follower in self.get_followed_by():
             follower.receive(new_tweet)            
 
     def receive(self, tweet):
         TweetsReceived(by_username=self).append(tweet).save()
+
+    def get_followed_by(self, *args, **kwargs):
+        return FollowedBy(username=self).load(*args, **kwargs)
+
+    def get_following(self, *args, **kwargs):
+        return Following(username=self).load(*args, **kwargs)
+
+    def get_tweets_sent(self, *args, **kwargs):
+        return TweetsSent(by_username=self).load(*args, **kwargs).resolve()
+
+    def get_tweets_received(self, *args, **kwargs):
+        return TweetsSent(by_username=self).load(*args, **kwargs).resolve()
 
 class Tweet(Model):
     uuid    = RowKey(autogenerate=True) # generate a UUID for us.
@@ -43,30 +57,30 @@ class Tweet(Model):
         tr = TweetsReceived(by_username=ALLTWEETS_KEY)
         return tr.load(*args, **kwargs).loadIterValues()
 
-    def __repr__(self):
-        return '<%s> %s' % (self['author']['username'], self['message'])
+    # def __repr__(self):
+    #     return '<%s> %s' % (self['author']['username'], self['message'])
 
 class TweetsSent(Index):
-    """An index is an ordered mapping from one RowKey to
-       many other Objects of a specific type."""
-    by_username = RowKey(linked_from=User, autoload_values=True)
+    """An index is an ordered mapping from a RowKey to
+       instances of a specific Model."""
+    by_username = RowKey()
     targetmodel = ForeignKey(foreign_class=Tweet, compare_with='TimeUUIDType')
 
 class TweetsReceived(Index):
-    by_username = RowKey(linked_from=User, autoload_values=True)
+    by_username = RowKey()
     targetmodel = ForeignKey(foreign_class=Tweet, compare_with='TimeUUIDType')
 
 class Following(Index):
-    username = RowKey(linked_from=User)
+    username = RowKey()
     targetmodel = ForeignKey(foreign_class=User, compare_with='TimeUUIDType', 
                              unique=True)    
 
-class FollowedBxy(Index):
-    username = RowKey(linked_from=User)
+class FollowedBy(Index):
+    username = RowKey()
     targetmodel = ForeignKey(foreign_class=User, compare_with='TimeUUIDType',
                              unique=True)
 
-# We're done with defining the Data Model. Let's verify that Cassandra shares our model!
+# We're done with defining the Data Model. Let's verify that Cassandra agrees on the model!
 twitty_keyspace.verify_datamodel()
 # Ok, all set. Let's go!
 
@@ -86,5 +100,5 @@ for dude in (dave,peter,merlin):
     name = dude['username']
     print '%s has these followers:' % (name,), dude.get_followed_by().values()
     print '%s follows' % (name,), dude.get_following().values()
-    print '%s sent' % (name,), [x for x in dude.get_tweets_sent(count=5)]
-    print '%s received' % (name,), [x for x in dude.get_tweets_received(count=5)]
+    print '%s sent' % (name,), [x for x in dude.get_tweets_sent(count=3)]
+    print '%s received' % (name,), [x for x in dude.get_tweets_received(count=3)]
