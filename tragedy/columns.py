@@ -4,7 +4,7 @@ from . import timestamp
 
 class ConvertAPI(object):
     def __init__(self, *args, **kwargs):
-        self.required = kwargs.pop('required', True)
+        self.mandatory = kwargs.pop('mandatory', True)
         
     def to_internal(self, column_key, value):
         return self.key_to_internal(column_key), self.value_to_internal(value)

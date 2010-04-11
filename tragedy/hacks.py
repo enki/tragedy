@@ -1,16 +1,17 @@
-# Helpers for rapid and dirty local development.
+# This file contains ugly/unfinished hacks that almost certainly noone should ever use.
 import sys
 import os
 import time
 from .util import unhandled_exception_handler
 
-template = '/Users/enki/Projects/apache-cassandra-0.6.0-beta3/conf/tmpl.storage-conf.xml'
-target = '/Users/enki/Projects/apache-cassandra-0.6.0-beta3/conf/storage-conf.xml'
-pidfile = '/Users/enki/Projects/apache-cassandra-0.6.0-beta3/cassandra.pid'
-cassandrabin = '/Users/enki/Projects/apache-cassandra-0.6.0-beta3/bin/cassandra'
+want_boot = False
+
+try: # this isn't intended for use by anyone yet.
+    from tragedyconf import *
+except:
+    pass
 
 started = False
-want_boot = True
 
 def boot(keyspace=None):
     global started
@@ -23,7 +24,7 @@ def boot(keyspace=None):
     success = False
     e = None
     try:
-        verifyAll(keyspace)
+        keyspace.verify_datamodel()
         success = True
     except:
         unhandled_exception_handler()
@@ -34,7 +35,7 @@ def boot(keyspace=None):
             try:
                 sleepytime = i*1.2
                 time.sleep(sleepytime)
-                verifyAll(keyspace)
+                keyspace.verify_keyspace()
                 success = True
             except Exception, e:
                 unhandled_exception_handler()
@@ -47,23 +48,8 @@ def boot(keyspace=None):
     else:
         raise e
 
-def verifyDataModel(cls):
-    allkeyspaces = cls._client.describe_keyspaces()
-    assert cls._keyspace.name in allkeyspaces, ("Cassandra doesn't know about " + 
-                                "keyspace %s (only %s)" % (cls._keyspace, allkeyspaces))
-    mykeyspace = cls._client.describe_keyspace(cls._keyspace.name)
-    assert cls._column_family in mykeyspace.keys(), "CF {0} doesn't exist on server.".format(cls._column_family)
-    mycf = mykeyspace[cls._column_family]
-    assert cls._column_type == mycf['Type'], 'Wrong column type (local %s, remote %s)' % (cls._column_type, mycf['Type'])
-    remotecw = mycf['CompareWith'].rsplit('.',1)[1]
-    assert cls._default_field.compare_with == remotecw, 'Wrong CompareWith (local %s, remote %s)' % (cls._default_field.compare_with, remotecw)
-
-def verifyAll(keyspace):
-    for cf in getattr(keyspace, 'rowclasses').values():
-        verifyDataModel(cf)
-
 def genconfigsnippet(keyspace):
-    return '\n'.join([genconfiglinefor(cf) for cf in getattr(keyspace, 'rowclasses').values()])
+    return '\n'.join([genconfiglinefor(cf) for cf in getattr(keyspace, 'models').values()])
 
 def genconfiglinefor(cls):
     return '<ColumnFamily Name="{name}" CompareWith="{compare_with}"/>'.format(

@@ -89,8 +89,8 @@ class RowDefaults(object):
     _timestamp_func = staticmethod(gm_timestamp)
     
     # We complain when there are attempts to set columns without spec.
-    # default specs should normally never be required!
-    _default_field = MissingField(required=False)
+    # default specs should normally never be mandatory!
+    _default_field = MissingField(mandatory=False)
     
     # we generally try to preserve order of columns, but this tells us it's ok not to occasionally.
     _ordered = False
@@ -196,16 +196,16 @@ class BasicRow(RowDefaults):
         self.ordered_columnkeys.add(column_key)
         self.column_value[column_key] = value
     
-    def yield_column_key_value_pairs(self, only_warn_about_required=False, **kwargs):
+    def yield_column_key_value_pairs(self, only_warn_about_mandatory=False, **kwargs):
         access_mode = kwargs.pop('access_mode', 'to_identity')
         
         missing_cols = OrderedSet()
         for column_key, spec in self.column_spec.items():
-            if spec.required and not self.column_value.get(column_key):
-                if only_warn_about_required:
+            if spec.mandatory and not self.column_value.get(column_key):
+                if only_warn_about_mandatory:
                     yield getattr(spec, 'key_' + access_mode)(column_key) , '#MISSING#'
                 elif not hasattr(self, 'targetmodel'):
-                    raise Exception("Column '%s' of type '%s' required but missing." % (column_key, spec))
+                    raise Exception("Column '%s' of type '%s' mandatory but missing." % (column_key, spec))
 
         for column_key in self.ordered_columnkeys:
             spec = self.get_spec_for_columnkey(column_key)            
@@ -253,10 +253,10 @@ class BasicRow(RowDefaults):
 
     def delete(self, column_key):
         # XXX: keep track of delete
-        # XXX: can't delete if default columnspec is 'required'.
+        # XXX: can't delete if default columnspec is 'mandatory'.
         spec = self.get_spec_for_columnkey(column_key)
-        if spec.required:
-            raise 'Trying to delete required column %s' % (column_key,)
+        if spec.mandatory:
+            raise 'Trying to delete mandatory column %s' % (column_key,)
         del self.column_value[column_key]
 
 # ----- Load Data -----
@@ -365,9 +365,9 @@ class BasicRow(RowDefaults):
         
     def __repr__(self):
         dtype = OrderedDict if self._ordered else dict
-        return '<{0} {1}: {2}>'.format(self.__class__.__name__, self.row_key, repr(dtype( 
+        return '<%s %s: %s>' % (self.__class__.__name__, self.row_key, repr(dtype( 
             self.get_spec_for_columnkey(column_key).to_display(column_key,value) for column_key,value in 
-                    self.yield_column_key_value_pairs(only_warn_about_required=True))))
+                    self.yield_column_key_value_pairs(only_warn_about_mandatory=True))))
 
     def path(self, column_key=None):
         """For now just a way to display our position in a kind of DOM."""

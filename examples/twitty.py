@@ -11,8 +11,8 @@ class User(Model):
     """A Model is stored and retrieved by its RowKey.
        Every Model has exactly one RowKey and one or more other Fields"""
     username  = RowKey()
-    firstname = StringField(required=False)
-    lastname  = StringField(required=False) # normally fields are mandatory
+    firstname = StringField(mandatory=False)
+    lastname  = StringField(mandatory=False) # normally fields are mandatory
     password  = StringField()
 
     def follow(self, *one_or_more):
@@ -36,7 +36,7 @@ class User(Model):
 class Tweet(Model):
     uuid    = RowKey(autogenerate=True) # generate a UUID for us.
     message = StringField()    
-    author  = ForeignKey(foreign_class=User, required=True)
+    author  = ForeignKey(foreign_class=User, mandatory=True)
 
     @staticmethod
     def get_recent_tweets(*args, **kwargs):
@@ -61,12 +61,14 @@ class Following(Index):
     targetmodel = ForeignKey(foreign_class=User, compare_with='TimeUUIDType', 
                              unique=True)    
 
-class FollowedBy(Index):
+class FollowedBxy(Index):
     username = RowKey(linked_from=User)
     targetmodel = ForeignKey(foreign_class=User, compare_with='TimeUUIDType',
                              unique=True)
 
-# We're done with defining the Data Model. Let's use it!
+# We're done with defining the Data Model. Let's verify that Cassandra shares our model!
+twitty_keyspace.verify_datamodel()
+# Ok, all set. Let's go!
 
 dave = User(username='dave', firstname='dave', password='test').save()
 merlin = User(username='merlin', firstname='merlin', password='sunshine').save()
