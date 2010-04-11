@@ -13,7 +13,7 @@ Here's an example:
     	message = StringField()    
     	author  = ForeignKey(foreign_class=User, mandatory=True)
 
-Tweet is a Model, analogous to a Python class. If we instantiate Tweet, we get a specific tweet that we can write to the database:
+Tweet is a Model specification. If we instantiate Tweet, we get a specific tweet that we can write to the database:
 
     new_tweet = Tweet(message="Twittering from tragedy!", author='merlin')
 	new_tweet.save()
