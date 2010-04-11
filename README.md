@@ -48,7 +48,7 @@ To actually load the tweets we need to resolve them (retrieve them using their R
 
 Behind the scenes Index.resolve() almost works like calling Model.load() on all Tweets in the list. It's more efficient though, since this combines all required queries into one multiquery for faster processing. Now we've seen how to create tweets, store them, and find them again. If you want to see how you can distribute them to Followers, scroll down for a full example of a twitter-like application.
 
-That's about it for the basics. There's more stuff Tragedy can do for you, like automatic validation that Tragedy and Cassandra agree on the Data Model, and the following example shows of some of them. And get in touch if you have questions!
+That's about it for the basics. There's more stuff Tragedy can do for you, like automatic validation that Tragedy and Cassandra agree on the Data Model, and the following example shows of some of them. Get in touch if you have questions!
 
 ## Installation
   $ setup.py install   (optionally --cassandra to install the compiled cassandra thrift bindings)
