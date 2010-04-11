@@ -1,6 +1,6 @@
 # Tragedy
 
-Tragedy is a high-level Cassandra Object Abstraction Manager for Python.
+Tragedy is a high-level Cassandra Object Abstraction for Python.
 
 ## Tragedy's Data Model
 
