@@ -8,7 +8,7 @@ In Tragedy you build your data model from Models and Indexes. An abstract *Model
 
 An *Index* is a special kind of Model with an unlimited number of Columns that all have the same Field-Type (usually ForeignKey). Indexes are used to map from one RowKey (e.g. an Username), to an ordered list of many others (e.g. a list of Blogposts). The Index is accessed with a RowKey, and doesn't store any data except for the ordered list of RowKeys to other Models.
 
-Since distributed datastores like Cassandra don't support queries other than retrieving Models by RowKey, you have to create your Indexes when you write your data. By carefully tying Models and Indexes together, you can build complex applications that can run on large computing clusters without running into scalability problems.
+Since distributed datastores like Cassandra don't support queries other than retrieving Models by RowKey, you have to create your Indexes when you write your data. By carefully tying Models and Indexes together, you can build complex but efficient applications that can run on large computing clusters.
 
 Here's a simple example. Let's define and store a Tweet for a twitter-like application:
 	class Tweet(Model):
