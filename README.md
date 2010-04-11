@@ -4,13 +4,13 @@ Tragedy is a high-level Cassandra abstraction for Python.
 
 ## Tragedy's Data Model
 
-In Tragedy you build your data model from Models and Indexes. An abstract *Model* specifies the kind data that can be stored in a Model-Instance. We also call a Model-Instance a Row, since specific Model-Instances are uniquely identified, and can only be retrieved and stored by their unique RowKey. The attributes of the Model correspond to the Columns of the Row. Each Column has a Field-Type like StringField or IntegerField. The RowKey decides which specific Row/Model-Instance the user is referring to and on which physical machine the data is stored. Any Unicode string can be used as RowKey as long as it is unique among all Rows of a Model. If there's no naturally unique identifier for the data in a Row, you can ask Tragedy to generate a UUID-RowKey for you.
+In Tragedy you build your data model from Models and Indexes. An abstract *Model* specifies the kind data that can be stored in a Model-Instance. We also call a Model-Instance a Row, since specific Model-Instances are uniquely identified by their unique RowKey. Knowing the RowKey and Model is all you need to store and retrieve data from Cassandra. The attributes of the Model correspond to the Columns of a Row. Each Column has a Field-Type like StringField or IntegerField. The RowKey decides which specific Row/Model-Instance the user is referring to and on which physical machine the data is stored. If you lose a RowKey, you can never store or retrieve that data again. Any Unicode string can be used as RowKey as long as it is unique among all Rows of a Model. If there's no naturally unique identifier for the data in a Row, you can ask Tragedy to generate a UUID-RowKey for you.
 
-An *Index* is a special kind of Model with an unlimited number of Columns that all have the same Field-Type (usually ForeignKey). Indexes are used to map from one RowKey (e.g. an Username), to an ordered list of others (e.g. a list of Blogposts). The Index is accessed with a RowKey, and doesn't contain any data except for the ordered list of RowKeys to other Models.
+An *Index* is a special kind of Model with an unlimited number of Columns that all have the same Field-Type (usually ForeignKey). Indexes are used to map from one RowKey (e.g. an Username), to an ordered list of many others (e.g. a list of Blogposts). The Index is accessed with a RowKey, and doesn't store any data except for the ordered list of RowKeys to other Models.
 
-Since distributed datastores like Cassandra don't support queries other than retrieving Models by RowKey, you have to create your Indexes when you write your data. By carefully tying Models and Indexes together, you can build complex applications that can run on large datastore clusters without running into scalability problems.
+Since distributed datastores like Cassandra don't support queries other than retrieving Models by RowKey, you have to create your Indexes when you write your data. By carefully tying Models and Indexes together, you can build complex applications that can run on large computing clusters without running into scalability problems.
 
-Here's a simple example:
+Here's a simple example. Let's define and store a Tweet for a twitter-like application:
 	class Tweet(Model):
     	uuid    = RowKey(autogenerate=True) # generate a UUID for us.
     	message = StringField()    
