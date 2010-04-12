@@ -9,5 +9,10 @@ from .rows import (RowKey,
 from .columns import (BooleanField,
                       ForeignKey,
                       StringField,
+                      IntegerField,
+                      FloatField,
+                      DictField,
+                      ListField,
+                      TimestampField,
                      )
 from .hacks import boot

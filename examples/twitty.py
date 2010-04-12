@@ -2,8 +2,8 @@ import tragedy
 client = tragedy.connect(['localhost:9160'])
 from tragedy import *
 
-twitty_cluster  = Cluster('Twitty Cluster')
-twitty_keyspace = Keyspace('Twitty', twitty_cluster)
+dev_cluster  = Cluster('Dev Cluster')
+twitty_keyspace = Keyspace('Twitty', dev_cluster)
 
 ALLTWEETS_KEY = '!ALLTWEETS!' # virtual user that receives all tweets
 

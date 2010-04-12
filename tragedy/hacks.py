@@ -35,7 +35,7 @@ def boot(keyspace=None):
             try:
                 sleepytime = i*1.2
                 time.sleep(sleepytime)
-                keyspace.verify_keyspace()
+                keyspace.verify_datamodel()
                 success = True
             except Exception, e:
                 unhandled_exception_handler()
@@ -48,12 +48,25 @@ def boot(keyspace=None):
     else:
         raise e
 
+keyspaceconf = """
+<ReplicaPlacementStrategy>org.apache.cassandra.locator.RackUnawareStrategy</ReplicaPlacementStrategy>
+<ReplicationFactor>1</ReplicationFactor>
+<EndPointSnitch>org.apache.cassandra.locator.EndPointSnitch</EndPointSnitch>
+"""
+
 def genconfigsnippet(keyspace):
-    return '\n'.join([genconfiglinefor(cf) for cf in getattr(keyspace, 'models').values()])
+    print 'OHWOW', keyspace
+    begin = """<Keyspace Name="%s">\n""" % (keyspace.name)
+    middle = '\n'.join([genconfiglinefor(cf) for cf in getattr(keyspace, 'models').values()])
+    end = """</Keyspace>"""
+    total = begin + middle + keyspaceconf + end
+    print total
+    return total
 
 def genconfiglinefor(cls):
-    return '<ColumnFamily Name="{name}" CompareWith="{compare_with}"/>'.format(
+    mydesc = '<ColumnFamily Name="{name}" CompareWith="{compare_with}"/>'.format(
                 name=cls._column_family, compare_with=cls._default_field.compare_with )
+    return mydesc
 
 def replacePlaceholder(configstring):
     newconfig = open(template, 'r').read().replace('[[[PLACEHOLDER]]]', configstring)

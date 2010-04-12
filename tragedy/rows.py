@@ -202,11 +202,23 @@ class BasicRow(RowDefaults):
         
         missing_cols = OrderedSet()
         for column_key, spec in self.column_spec.items():
+            value = self.column_value.get(column_key)
             if spec.mandatory and not self.column_value.get(column_key):
-                if only_warn_about_mandatory:
+                if spec.default:
+                    if hasattr(spec.default, '__call__'):
+                        default = spec.default()
+                    else:
+                        default = spec.default
+                    self.column_value[column_key] = default
+                    self.ordered_columnkeys.add(column_key)
+                elif only_warn_about_mandatory:
                     yield getattr(spec, 'key_' + access_mode)(column_key) , '#MISSING#'
                 elif not hasattr(self, 'targetmodel'):
                     raise Exception("Column '%s' of type '%s' mandatory but missing." % (column_key, spec))
+                
+            if value and column_key not in self.ordered_columnkeys:
+                raise Exception('Value set, but column_key not in ordered_columnkeys. WTF?')
+                
 
         for column_key in self.ordered_columnkeys:
             spec = self.get_spec_for_columnkey(column_key)            

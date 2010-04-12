@@ -62,8 +62,8 @@ Come hang out on #cassandra on irc.freenode.net. My email address is enki@bbq.io
     client = tragedy.connect(['localhost:9160'])
     from tragedy import *
     
-    twitty_cluster  = Cluster('Twitty Cluster')
-    twitty_keyspace = Keyspace('Twitty', twitty_cluster)
+    dev_cluster  = Cluster('Dev Cluster')
+    twitty_keyspace = Keyspace('Twitty', dev_cluster)
     
     ALLTWEETS_KEY = '!ALLTWEETS!' # virtual user that receives all tweets
     

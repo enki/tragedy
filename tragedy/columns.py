@@ -1,8 +1,11 @@
 import time
 import uuid
 from . import timestamp
+import simplejson as json
 
 class ConvertAPI(object):
+    default = False
+    
     def __init__(self, *args, **kwargs):
         self.mandatory = kwargs.pop('mandatory', True)
         
@@ -51,14 +54,21 @@ class IdentityField(Field):
 class StringField(Field):
     pass
 
-class TimeUUIDField(Field):
-    def key_to_display(self, column_key): # called before displaying data
+class TimestampField(Field):
+    def __init__(self, *args, **kwargs):
+        autoset_on_create = kwargs.pop('autoset_on_create', False)    
+        if autoset_on_create:
+            self.default = lambda: uuid.uuid1().bytes
+        super(TimestampField, self).__init__(self, *args, **kwargs)
+            
+        
+    def value_to_display(self, column_key): # called before displaying data
         return time.ctime(timestamp.fromUUID(uuid.UUID(bytes=column_key)))
 
-    def key_to_external(self, column_key):
+    def value_to_external(self, column_key):
         return uuid.UUID(bytes=column_key).hex
     
-    def key_to_internal(self, column_key):
+    def value_to_internal(self, column_key):
         return uuid.UUID(hex=column_key).bytes
 
 class ForeignKey(Field):
@@ -84,6 +94,20 @@ class MissingField(Field):
     def key_to_internal(self, column_key):
         raise Exception('No Specification for Key %s' % (column_key,))
 
+class IntegerField(Field):
+    def value_to_external(self, value):
+        return int(value)
+    
+    def value_to_internal(self, value):
+        return str(int(value))
+
+class FloatField(Field):
+    def value_to_external(self, value):
+        return float(value)
+    
+    def value_to_internal(self, value):
+        return str(float(value))
+
 class BooleanField(Field):    
     def value_to_external(self, value):
         if value == True or value == "1":
@@ -92,3 +116,13 @@ class BooleanField(Field):
     
     def value_to_internal(self, value):
         return "1" if value else "0"
+
+class JSONField(Field):
+    def value_to_internal(self, value):
+        return json.dumps(value)
+    
+    def value_to_external(self, value):
+        return json.loads(value)
+
+DictField = JSONField
+ListField = JSONField
