@@ -197,23 +197,22 @@ class BasicRow(RowDefaults):
         self.ordered_columnkeys.add(column_key)
         self.column_value[column_key] = value
     
-    def yield_column_key_value_pairs(self, only_warn_about_mandatory=False, **kwargs):
+    def yield_column_key_value_pairs(self, for_saving=False, only_warn_about_mandatory=False, **kwargs):
         access_mode = kwargs.pop('access_mode', 'to_identity')
         
         missing_cols = OrderedSet()
         for column_key, spec in self.column_spec.items():
             value = self.column_value.get(column_key)
             if spec.mandatory and not self.column_value.get(column_key):
-                if spec.default:
+                if for_saving and spec.default:
+                    print 'USING DEFAULT'
                     if hasattr(spec.default, '__call__'):
                         default = spec.default()
                     else:
                         default = spec.default
                     self.column_value[column_key] = default
                     self.ordered_columnkeys.add(column_key)
-                elif only_warn_about_mandatory:
-                    yield getattr(spec, 'key_' + access_mode)(column_key) , '#MISSING#'
-                elif not hasattr(self, 'targetmodel'):
+                elif for_saving and not hasattr(self, 'targetmodel'):
                     raise Exception("Column '%s' of type '%s' mandatory but missing." % (column_key, spec))
                 
             if value and column_key not in self.ordered_columnkeys:
@@ -223,9 +222,14 @@ class BasicRow(RowDefaults):
         for column_key in self.ordered_columnkeys:
             spec = self.get_spec_for_columnkey(column_key)            
             value = self.get_value_for_columnkey(column_key)
-            column_key, value = getattr(spec, access_mode)(column_key, value)
-            if value is None:
-                continue
+            
+            if value:
+                column_key, value = getattr(spec, access_mode)(column_key, value)
+            else:
+                column_key = getattr(spec, 'key_' + access_mode)(column_key)
+                
+            # if value is None:
+            #     continue
             
             yield column_key, value
 
@@ -364,7 +368,7 @@ class BasicRow(RowDefaults):
         
     def _real_save(self, save_row_key=None, *args, **kwargs):
         save_columns = []
-        for column_key, value in self.yield_column_key_value_pairs(check_for_saving=True):
+        for column_key, value in self.yield_column_key_value_pairs(for_saving=True):
             column = Column(name=column_key, value=value, timestamp=self._timestamp_func())
             save_columns.append( ColumnOrSuperColumn(column=column) )
                 
@@ -383,7 +387,7 @@ class BasicRow(RowDefaults):
         dtype = OrderedDict if self._ordered else dict
         return '<%s %s: %s>' % (self.__class__.__name__, self.row_key, repr(dtype( 
             self.get_spec_for_columnkey(column_key).to_display(column_key,value) for column_key,value in 
-                    self.yield_column_key_value_pairs(only_warn_about_mandatory=True))))
+                    self.yield_column_key_value_pairs())))
 
     def path(self, column_key=None):
         """For now just a way to display our position in a kind of DOM."""
@@ -404,7 +408,9 @@ class DictRow(BasicRow):
     def __getitem__(self, column_key):
         spec = self.get_spec_for_columnkey(column_key)
         value = self.get_value_for_columnkey(column_key)
-        return spec.value_to_external(value)
+        if value:
+            value = spec.value_to_external(value)
+        return value
     
     def __setitem__(self, column_key, value):
         self.update( [(column_key, value)] )

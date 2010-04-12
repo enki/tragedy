@@ -62,14 +62,14 @@ class TimestampField(Field):
         super(TimestampField, self).__init__(self, *args, **kwargs)
             
         
-    def value_to_display(self, column_key): # called before displaying data
-        return time.ctime(timestamp.fromUUID(uuid.UUID(bytes=column_key)))
+    def value_to_display(self, value): # called before displaying data
+        return time.ctime(timestamp.fromUUID(uuid.UUID(bytes=value)))
 
-    def value_to_external(self, column_key):
-        return uuid.UUID(bytes=column_key).hex
+    def value_to_external(self, value):
+        return uuid.UUID(bytes=value).hex
     
-    def value_to_internal(self, column_key):
-        return uuid.UUID(hex=column_key).bytes
+    def value_to_internal(self, value):
+        return uuid.UUID(hex=value).bytes
 
 class ForeignKey(Field):
     def __init__(self, *args, **kwargs):
