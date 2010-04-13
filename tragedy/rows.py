@@ -205,7 +205,6 @@ class BasicRow(RowDefaults):
             value = self.column_value.get(column_key)
             if spec.mandatory and not self.column_value.get(column_key):
                 if for_saving and spec.default:
-                    print 'USING DEFAULT'
                     if hasattr(spec.default, '__call__'):
                         default = spec.default()
                     else:
