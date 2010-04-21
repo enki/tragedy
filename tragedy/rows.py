@@ -409,6 +409,8 @@ class DictRow(BasicRow):
         value = self.get_value_for_columnkey(column_key)
         if value:
             value = spec.value_to_external(value)
+        else:
+            raise ValueError('No Value set for %s' % (column_key,))
         return value
     
     def __setitem__(self, column_key, value):
