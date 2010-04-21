@@ -29,6 +29,7 @@ class RowKey(ConvertAPI):
         self.linked_from = kwargs.pop('linked_from', None)
         self.by_funcname = kwargs.pop('by_funcname', None)
         self.autoload_values = kwargs.pop('autoload_values', False)
+        self.default = kwargs.pop('default', None)
     
     def value_to_internal(self, value):
         if hasattr(value, 'row_key'):
@@ -330,6 +331,11 @@ class BasicRow(RowDefaults):
             yield cls( **unordered[row_key] )
     
     def load(self, *args, **kwargs):
+        if not self.row_key and self._row_key_spec.default:
+            if callable(self._row_key_spec.default):
+                self.row_key = self._row_key_spec.default()
+            else:
+                self.row_key = self._row_key_spec.default                
         assert self.row_key, 'No row_key and no non-null non-empty keys argument. Did you use the right row_key_name?'
         load_subkeys = kwargs.pop('load_subkeys', False)
         tkeys = [self.row_key]
@@ -369,6 +375,11 @@ class BasicRow(RowDefaults):
         if not self.row_key:
             if self._row_key_spec.autogenerate:
                 self.generate_row_key()
+            elif self._row_key_spec.default:
+                if callable(self._row_key_spec.default):
+                    self.row_key = self._row_key_spec.default()
+                else:
+                    self.row_key = self._row_key_spec.default
             else:
                 raise Exception('No row_key set!')
         

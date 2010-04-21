@@ -25,6 +25,15 @@ class InventoryType(type):
             if isinstance(value, RowKey):
                 value.prepare_referencing_class(new_cls, key)
 
+            from .columns import AutoIndex
+            if isinstance(value, AutoIndex):
+                from .columns import ForeignKey
+                class AutoIndexImplementation(Index):
+                    _column_family = 'Auto_' + name + '_' + key
+                    row_key = RowKey(default=key)
+                    targetmodel = ForeignKey(foreign_class=new_cls, compare_with='TimeUUIDType')
+                setattr(new_cls, key, AutoIndexImplementation)
+
         if hasattr(new_cls, 'targetmodel'):
             new_cls._default_field = new_cls.targetmodel
 

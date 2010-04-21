@@ -14,6 +14,7 @@ from .columns import (BooleanField,
                       DictField,
                       ListField,
                       TimestampField,
+                      AutoIndex,
 		      JSONField,
                      )
 from .hacks import boot

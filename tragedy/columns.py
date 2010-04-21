@@ -126,3 +126,7 @@ class JSONField(Field):
 
 DictField = JSONField
 ListField = JSONField
+
+class AutoIndex(object):
+    pass
+    # __autoindex__ = True
