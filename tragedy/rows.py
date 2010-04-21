@@ -197,26 +197,38 @@ class BasicRow(RowDefaults):
         self.ordered_columnkeys.add(column_key)
         self.column_value[column_key] = value
     
-    def yield_column_key_value_pairs(self, for_saving=False, only_warn_about_mandatory=False, **kwargs):
-        access_mode = kwargs.pop('access_mode', 'to_identity')
-        
+    def listMissingColumns(self):
         missing_cols = OrderedSet()
+        
         for column_key, spec in self.column_spec.items():
             value = self.column_value.get(column_key)
             if spec.mandatory and not self.column_value.get(column_key):
-                if for_saving and spec.default:
+                # if for_saving and spec.default:
+                if spec.default:
                     if hasattr(spec.default, '__call__'):
                         default = spec.default()
                     else:
                         default = spec.default
                     self.column_value[column_key] = default
                     self.ordered_columnkeys.add(column_key)
-                elif for_saving and not hasattr(self, 'targetmodel'):
-                    raise Exception("Column '%s' of type '%s' mandatory but missing." % (column_key, spec))
+                elif not hasattr(self, 'targetmodel'):
+                    missing_cols.append(column_key)
                 
             if value and column_key not in self.ordered_columnkeys:
                 raise Exception('Value set, but column_key not in ordered_columnkeys. WTF?')
-                
+            
+        return missing_cols
+    
+    def isComplete(self):
+        return not self.listMissingColumns()
+    
+    def yield_column_key_value_pairs(self, for_saving=False, **kwargs):
+        access_mode = kwargs.pop('access_mode', 'to_identity')
+        
+        missing_cols = self.listMissingColumns()
+        if for_saving and missing_cols:
+            raise Exception("Columns %s mandatory but missing." % 
+                        ([(ck,self.column_spec[ck]) for ck in missing_cols], spec))
 
         for column_key in self.ordered_columnkeys:
             spec = self.get_spec_for_columnkey(column_key)            
