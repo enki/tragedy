@@ -212,7 +212,7 @@ class BasicRow(RowDefaults):
                     self.column_value[column_key] = default
                     self.ordered_columnkeys.add(column_key)
                 elif not hasattr(self, 'targetmodel'):
-                    missing_cols.append(column_key)
+                    missing_cols.add(column_key)
                 
             if value and column_key not in self.ordered_columnkeys:
                 raise Exception('Value set, but column_key not in ordered_columnkeys. WTF?')
