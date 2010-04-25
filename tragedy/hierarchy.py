@@ -30,7 +30,6 @@ class InventoryType(type):
                 from .columns import ForeignKey
                 class AutoIndexImplementation(Index):
                     _column_family = 'Auto_' + name + '_' + key
-                    _klass = new_cls
                     row_key = RowKey(default=key)
                     targetmodel = ForeignKey(foreign_class=new_cls, compare_with='TimeUUIDType')
                     
@@ -40,7 +39,8 @@ class InventoryType(type):
                                                 
                 # print 'CREATED', AutoIndexImplementation._column_family
                 setattr(new_cls, key, AutoIndexImplementation)
-                new_cls.save_hooks.add(AutoIndexImplementation.target_saved)
+                if getattr(value, 'autosave', False):
+                    new_cls.save_hooks.add(AutoIndexImplementation.target_saved)
 
         if hasattr(new_cls, 'targetmodel'):
             new_cls._default_field = new_cls.targetmodel

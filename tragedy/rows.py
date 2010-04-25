@@ -139,7 +139,6 @@ class BasicRow(RowDefaults):
         self.column_changed  = {}  # these have no order themselves, but the keys are the same as above
         self.column_spec     = {}  #
         
-        self.indexes = OrderedSet()
         self.mirrors = OrderedSet()
                 
         # Our Row Key
@@ -396,6 +395,8 @@ class BasicRow(RowDefaults):
                 raise Exception('No row_key set!')
         
         for save_row_key in itertools.chain((self.row_key,), self.mirrors):
+            if callable(save_row_key):
+                save_row_key = save_row_key()
             self._real_save(save_row_key=save_row_key, *args, **kwargs)
         
         for hook in self.save_hooks:
@@ -441,17 +442,6 @@ class BasicRow(RowDefaults):
 class DictRow(BasicRow):
     """Row with a public dictionary interface to set and get columns."""
     __abstract__ = True
-    _auto_timestamp = True
-    
-    def init(self, *args, **kwargs):
-        self.update(*args, **kwargs)
-        
-    @classmethod
-    def _init_class(cls):
-        super(DictRow, cls)._init_class()
-        if cls._auto_timestamp:
-            cls.created_at = TimeField(autoset_on_create=True)
-            cls.last_modified = TimeField(autoset_on_save=True)
     
     def __getitem__(self, column_key):
         value = self.get(column_key)
@@ -473,15 +463,27 @@ class DictRow(BasicRow):
             value = default
         return value
 
-Model = DictRow
+class Model(DictRow):
+    _auto_timestamp = True
+    __abstract__ = True
+    
+    @classmethod
+    def _init_class(cls):
+        super(Model, cls)._init_class()
+        if cls._auto_timestamp:
+            cls.created_at = TimeField(autoset_on_create=True)
+            cls.last_modified = TimeField(autoset_on_save=True)    
 
-class Index(BasicRow):
+class Index(DictRow):
     """A row which doesn't care about column names, and that can be appended to."""
     __abstract__ = True
     _default_field = None
     _ordered = True
 
     def is_unique(self, target):
+        if self.targetmodel.compare_with != 'TimeUUIDType':
+            return True
+            
         MAXCOUNT = 20000000
         self.load(count=MAXCOUNT) # XXX: we will blow up here at some point
                                   # i don't know where the real limit is yet.
@@ -491,14 +493,20 @@ class Index(BasicRow):
             return False
         return True
         
+    def get_next_column_key(self):
+        if self.targetmodel.compare_with == 'TimeUUIDType':
+            return uuid.uuid1().bytes
+        raise AttributeError("No auto-ordering except for TimeUUID supported.")
+        
     def append(self, target):
         if self.targetmodel.unique and not self.is_unique(target):
             return self
             
         target = self.targetmodel.value_to_internal(target)
+        
+        column_key = self.get_next_column_key()
 
-        newuuid = uuid.uuid1().bytes
-        self._update( [(newuuid, target)] )
+        self._update( [(column_key, target)] )
         return self
 
     def loadIterItems(self):

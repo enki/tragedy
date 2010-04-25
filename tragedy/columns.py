@@ -165,5 +165,5 @@ DictField = JSONField
 ListField = JSONField
 
 class AutoIndex(object):
-    pass
-    # __autoindex__ = True
+    def __init__(self, *args, **kwargs):
+        self.autosave = kwargs.pop('autosave', True)
