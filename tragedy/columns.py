@@ -88,7 +88,6 @@ class TimeField(Field):
 
     def value_for_saving(self, value):
         if self._autoset_on_save:
-            print 'AUTOSAVE'
             return self.get_default()
         else:
             return value
