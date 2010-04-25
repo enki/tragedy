@@ -119,9 +119,13 @@ class BooleanField(Field):
 
 class JSONField(Field):
     def value_to_internal(self, value):
+        print 'ENCODING TO INTERNAL', value, json.dumps(value)
+        import traceback
+        traceback.print_stack()
         return json.dumps(value)
     
     def value_to_external(self, value):
+        print 'JAA', type(value), value, json.loads(value)
         return json.loads(value)
 
 DictField = JSONField

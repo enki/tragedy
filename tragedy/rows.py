@@ -129,6 +129,7 @@ class BasicRow(RowDefaults):
 
     def __init__(self, *args, **kwargs):
         # We're starting to go live - tell our hacks to check the db!
+        
         boot()
         
         # Storage
@@ -330,6 +331,7 @@ class BasicRow(RowDefaults):
         for row_key, columns in cls.multiget_slice(*args, **kwargs):
             columns = OrderedDict(columns)
             columns['row_key'] = row_key
+            columns['access_mode'] = 'to_identity'
             if not ordered:
                 yield cls( **columns )
             else:
@@ -339,7 +341,9 @@ class BasicRow(RowDefaults):
             raise StopIteration
             
         for row_key in kwargs['keys']:
-            yield cls( **unordered[row_key] )
+            blah = unordered.get(row_key)
+            print 'FETCHED', blah
+            yield cls( **blah )
     
     def load(self, *args, **kwargs):
         if not self.row_key and self._row_key_spec.default:
@@ -456,11 +460,13 @@ class DictRow(BasicRow):
     def __setitem__(self, column_key, value):
         self.update( [(column_key, value)] )
 
-    def get(self, column_key, default=None):
+    def get(self, column_key, default=None, **kwargs):
+        access_mode = kwargs.pop('access_mode', 'to_external')
+        
         spec = self.get_spec_for_columnkey(column_key)
         value = self.get_value_for_columnkey(column_key)
         if value:
-            value = spec.value_to_external(value)
+            value = getattr(spec, 'value_' + access_mode)(value)
         else:
             value = default
         return value
