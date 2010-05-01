@@ -481,7 +481,9 @@ class Index(BasicRow):
         return itertools.izip(self.iterkeys(), self.loadIterValues())
 
     def loadIterValues(self):
-        return self.targetmodel.foreign_class.load_multi(keys=self.values(), orderdata=self.keys())
+        if self.values():
+            return self.targetmodel.foreign_class.load_multi(keys=self.values(), orderdata=self.keys())
+        return []
 
     def resolve(self):
         return self.loadIterValues()
