@@ -494,12 +494,13 @@ class Index(DictRow):
         return True
         
     def get_next_column_key(self):
-        if self.targetmodel.compare_with == 'TimeUUIDType':
-            return uuid.uuid1().bytes
-        raise AttributeError("No auto-ordering except for TimeUUID supported.")
+        # if self.targetmodel.compare_with == 'TimeUUIDType':
+        return uuid.uuid1().bytes
+        raise AttributeError("%s %s No auto-ordering except for TimeUUID supported." % (self, self.targetmodel))
         
     def append(self, target):
-        if self.targetmodel.unique and not self.is_unique(target):
+        if self.targetmodel.compare_with == 'TimeUUIDType' and \
+            self.targetmodel.unique and not self.is_unique(target):
             return self
             
         target = self.targetmodel.value_to_internal(target)

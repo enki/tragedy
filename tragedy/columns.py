@@ -6,6 +6,7 @@ import simplejson as json
 
 class ConvertAPI(object):
     default = False
+    unique = False
     
     def __init__(self, *args, **kwargs):
         self.mandatory = kwargs.pop('mandatory', True)
