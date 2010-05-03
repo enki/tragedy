@@ -229,7 +229,7 @@ class BasicRow(RowDefaults):
         missing_cols = self.listMissingColumns()
         if for_saving and missing_cols:
             raise Exception("Columns %s mandatory but missing." % 
-                        ([(ck,self.column_spec[ck]) for ck in missing_cols], spec))
+                        [(ck,self.column_spec[ck]) for ck in missing_cols])
 
         for column_key in self.ordered_columnkeys:
             spec = self.get_spec_for_columnkey(column_key)            
