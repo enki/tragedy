@@ -180,6 +180,9 @@ class BasicRow(RowDefaults):
     #     spec = self.get_spec_for_columnkey(column_key)
     #     internal_value = spec.value_to_internal(value)
     #     return self.set_value_for_columnkey(columnkey, internal_value)
+
+    def __eq__(self, other):
+        return self.row_key == other.row_key
     
     def get_spec_for_columnkey(self, column_key):
         spec = self.column_spec.get(column_key)
