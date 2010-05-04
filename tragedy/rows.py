@@ -169,7 +169,7 @@ class BasicRow(RowDefaults):
             self.column_spec[attr] = elem
         
         if not self._row_key_name:
-            raise TragedyTragedyException('need a name for the row key!')
+            raise TragedyException('need a name for the row key!')
 
 # ----- Access and convert data -----
     
