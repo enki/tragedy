@@ -17,7 +17,6 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-from exceptions import Exception
 import socket
 import threading
 from Queue import Queue
@@ -32,13 +31,11 @@ from cassandra import Cassandra
 
 from .util import unhandled_exception_handler
 from .hierarchy import cmcache
+from .exceptions import NoServerAvailable
 
 __all__ = ['connect', 'connect_thread_local', 'NoServerAvailable']
 
 DEFAULT_SERVER = 'localhost:9160'
-
-class NoServerAvailable(Exception):
-    pass
 
 def create_client_transport(server, framed_transport, timeout):
     host, port = server.split(":")

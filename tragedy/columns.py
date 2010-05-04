@@ -92,7 +92,7 @@ class ForeignKey(Field):
 
 class MissingField(Field):
     def key_to_internal(self, column_key):
-        raise Exception('No Specification for Key %s' % (column_key,))
+        raise TragedyException('No Specification for Key %s' % (column_key,))
 
 class IntegerField(Field):
     def value_to_external(self, value):

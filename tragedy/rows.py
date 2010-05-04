@@ -23,6 +23,8 @@ from .columns import (ConvertAPI,
 
 from .hacks import boot
 
+from .exceptions import TragedyException
+
 class RowKey(ConvertAPI):
     def __init__(self, *args, **kwargs):
         self.autogenerate = kwargs.pop('autogenerate', False)
@@ -167,7 +169,7 @@ class BasicRow(RowDefaults):
             self.column_spec[attr] = elem
         
         if not self._row_key_name:
-            raise Exception('need a name for the row key!')
+            raise TragedyTragedyException('need a name for the row key!')
 
 # ----- Access and convert data -----
     
@@ -219,7 +221,7 @@ class BasicRow(RowDefaults):
                     missing_cols.add(column_key)
                 
             if value and column_key not in self.ordered_columnkeys:
-                raise Exception('Value set, but column_key not in ordered_columnkeys. WTF?')
+                raise TragedyException('Value set, but column_key not in ordered_columnkeys. WTF?')
             
         return missing_cols
     
@@ -231,7 +233,7 @@ class BasicRow(RowDefaults):
         
         missing_cols = self.listMissingColumns()
         if for_saving and missing_cols:
-            raise Exception("Columns %s mandatory but missing." % 
+            raise TragedyException("Columns %s mandatory but missing." % 
                         [(ck,self.column_spec[ck]) for ck in missing_cols])
 
         for column_key in self.ordered_columnkeys:
@@ -288,7 +290,7 @@ class BasicRow(RowDefaults):
         # XXX: can't delete if default columnspec is 'mandatory'.
         spec = self.get_spec_for_columnkey(column_key)
         if spec.mandatory:
-            raise 'Trying to delete mandatory column %s' % (column_key,)
+            raise TragedyException('Trying to delete mandatory column %s' % (column_key,))
         del self.column_value[column_key]
 
 # ----- Load Data -----
@@ -384,7 +386,7 @@ class BasicRow(RowDefaults):
                 else:
                     self.row_key = self._row_key_spec.default
             else:
-                raise Exception('No row_key set!')
+                raise TragedyException('No row_key set!')
         
         for save_row_key in itertools.chain((self.row_key,), self.mirrors):
             self._real_save(save_row_key=save_row_key, *args, **kwargs)
