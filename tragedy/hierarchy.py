@@ -16,34 +16,7 @@ class InventoryType(type):
             return new_cls
         
         new_cls._init_class()
-        # Register us!
         new_cls._keyspace.register_model(getattr(new_cls, '_column_family', name), new_cls)
-        
-        from .rows import RowKey, Index
-        
-        for key, value in new_cls.__dict__.items():
-            if isinstance(value, RowKey):
-                value.prepare_referencing_class(new_cls, key)
-
-            from .columns import AutoIndex
-            if isinstance(value, AutoIndex):
-                from .columns import ForeignKey
-                class AutoIndexImplementation(Index):
-                    _column_family = 'Auto_' + name + '_' + key
-                    row_key = RowKey(default=key)
-                    targetmodel = ForeignKey(foreign_class=new_cls, compare_with='TimeUUIDType')
-                    
-                    @classmethod
-                    def target_saved(cls, target):
-                        cls().append(target).save()
-                                                
-                # print 'CREATED', AutoIndexImplementation._column_family
-                setattr(new_cls, key, AutoIndexImplementation)
-                if getattr(value, 'autosave', False):
-                    new_cls.save_hooks.add(AutoIndexImplementation.target_saved)
-
-        if hasattr(new_cls, 'targetmodel'):
-            new_cls._default_field = new_cls.targetmodel
 
         return new_cls
 

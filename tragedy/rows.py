@@ -39,50 +39,6 @@ class RowKey(ConvertAPI):
             value = value.row_key
         
         return value
-    
-    def prepare_referencing_class(self, cls, keyname):
-        if not self.linked_from:
-            return
-        name = cls.__name__
-        
-        if not self.by_funcname:
-            fixedname = []
-            first = True
-            for c in name:
-                if first:
-                    fixedname.append( c.lower() )
-                    first = False
-                elif c.islower():
-                    fixedname.append(c)
-                elif c.isupper():
-                    fixedname.append('_' + c.lower())
-            fixedname = ''.join(fixedname)
-        else:
-            fixedname = None
-        
-        if self.autoload_values:
-            def acccess_function(self, *args, **kwargs):
-                myargs = {keyname: self}
-                ts = cls(**myargs).load(*args, **kwargs)
-                return ts.loadIterValues()
-        else:
-            def acccess_function(self, *args, **kwargs):
-                myargs = {keyname: self}
-                ts = cls(**myargs).load(*args, **kwargs)
-                return ts
-        
-        if isinstance(self.linked_from, type):
-            models = [self.linked_from]
-        else:
-            models = self.linked_from
-        
-        if not self.by_funcname:
-            funcname = 'get_' + fixedname
-        else:
-            funcname = self.by_funcname
-            
-        for model in models:
-            setattr(model, funcname, acccess_function)
 
 class RowDefaults(object):
     """Configuration Defaults for Rows."""
@@ -300,13 +256,8 @@ class BasicRow(RowDefaults):
         # XXX: can't delete if default columnspec is 'mandatory'.
         spec = self.get_spec_for_columnkey(column_key)
         if spec.mandatory:
-<<<<<<< HEAD
-            raise 'Trying to delete mandatory column %s' % (column_key,)
-        del self.column_values[column_key]
-=======
             raise TragedyException('Trying to delete mandatory column %s' % (column_key,))
         del self.column_value[column_key]
->>>>>>> 236f66fb1f2f3d5591577285677987c1892154eb
 
 # ----- Load Data -----
 
