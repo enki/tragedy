@@ -1,10 +1,12 @@
 import time
 import uuid
 from . import timestamp
+from datetime import datetime
 import simplejson as json
 
 class ConvertAPI(object):
     default = False
+    unique = False
     
     def __init__(self, *args, **kwargs):
         self.mandatory = kwargs.pop('mandatory', True)
@@ -45,6 +47,15 @@ class ConvertAPI(object):
     def value_to_identity(self, value): # don't modify
         return value
 
+    def get_default(self):
+        if callable(self.default):
+            return self.default()
+        else:
+            return self.default
+
+    def value_for_saving(self, value):
+        return value
+
 class Field(ConvertAPI):
     compare_with = 'BytesType'
 
@@ -54,13 +65,40 @@ class IdentityField(Field):
 class StringField(Field):
     pass
 
+class TimeField(Field):    
+    def __init__(self, *args, **kwargs):
+        self._autoset_on_create = kwargs.pop('autoset_on_create', False)    
+        self._autoset_on_save = kwargs.pop('autoset_on_save', False) 
+        self._microseconds = kwargs.pop('microseconds', True)    
+        self._utc = kwargs.pop('utc', True)
+        
+        self._nowfunc = datetime.utcnow if self._utc else datetime.now
+        
+        if self._autoset_on_create or self._autoset_on_save:
+            self.default = lambda: self.value_to_internal(self._nowfunc())
+        super(TimeField, self).__init__(self, *args, **kwargs) 
+
+    def value_to_display(self, value): # called before displaying data
+        return str(value)
+
+    def value_to_external(self, value):
+        return timestamp.importUnix( float(value) )
+
+    def value_to_internal(self, value):
+        return str(timestamp.exportUnix(value, self._microseconds))
+
+    def value_for_saving(self, value):
+        if self._autoset_on_save:
+            return self.get_default()
+        else:
+            return value
+
 class TimestampField(Field):
     def __init__(self, *args, **kwargs):
         autoset_on_create = kwargs.pop('autoset_on_create', False)    
         if autoset_on_create:
             self.default = lambda: uuid.uuid1().bytes
-        super(TimestampField, self).__init__(self, *args, **kwargs)
-            
+        super(TimestampField, self).__init__(self, *args, **kwargs) 
         
     def value_to_display(self, value): # called before displaying data
         return time.ctime(timestamp.fromUUID(uuid.UUID(bytes=value)))
@@ -75,7 +113,7 @@ class ForeignKey(Field):
     def __init__(self, *args, **kwargs):
         self.foreign_class = kwargs.pop('foreign_class')
         self.resolve = kwargs.pop('resolve', False)
-        self.compare_with = kwargs.pop('compare_with', 'BytesType')
+        self.compare_with = kwargs.pop('compare_with', 'TimeUUIDType')
         self.unique = kwargs.pop('unique', False)
         super(ForeignKey, self).__init__(self, *args, **kwargs)
         
@@ -128,5 +166,5 @@ DictField = JSONField
 ListField = JSONField
 
 class AutoIndex(object):
-    pass
-    # __autoindex__ = True
+    def __init__(self, *args, **kwargs):
+        self.autosave = kwargs.pop('autosave', True)

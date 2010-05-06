@@ -19,6 +19,7 @@ from .columns import (ConvertAPI,
                      IdentityField,
                      ForeignKey,
                      MissingField,
+                     TimeField
                     )
 
 from .hacks import boot
@@ -95,6 +96,9 @@ class RowDefaults(object):
     
     # we generally try to preserve order of columns, but this tells us it's ok not to occasionally.
     _ordered = False
+        
+    _beensaved = False
+    _beenloaded = False
     
     # If our class configuration is incomplete, fill in defaults
     _column_type = 'Standard'
@@ -104,6 +108,7 @@ class RowDefaults(object):
         cls._column_family = getattr(cls, '_column_family', cls.__name__)
         cls._keyspace = getattr(cls, '_keyspace', cmcache.retrieve('keyspaces')[0])
         cls._client = getattr(cls, '_client', cmcache.retrieve('clients')[0])
+        cls.save_hooks = OrderedSet()
     
     # Default Consistency levels that have overrides.
     _read_consistency_level=ConsistencyLevel.ONE
@@ -125,17 +130,17 @@ class BasicRow(RowDefaults):
 
     def __init__(self, *args, **kwargs):
         # We're starting to go live - tell our hacks to check the db!
+        
         boot()
         
         # Storage
         self.ordered_columnkeys = OrderedSet()
-        self.column_value    = {}  #
+        self.column_values    = {}  #
         self.column_changed  = {}  # these have no order themselves, but the keys are the same as above
         self.column_spec     = {}  #
         
-        self.indexes = OrderedSet()
         self.mirrors = OrderedSet()
-        
+                
         # Our Row Key
         self.row_key = kwargs.pop('row_key', None)
         
@@ -145,7 +150,7 @@ class BasicRow(RowDefaults):
         # Extract the Columnspecs
         self.extract_specs_from_class()
         
-        self._update(*args, **kwargs)
+        self.update(*args, **kwargs)
         self.init(*args, **kwargs)
     
     def init(self, *args, **kwargs):
@@ -192,25 +197,22 @@ class BasicRow(RowDefaults):
     def get_value_for_columnkey(self, column_key):
         if column_key == self._row_key_name:
             return self.row_key
-        return self.column_value.get(column_key)
+        return self.column_values.get(column_key)
 
     def set_value_for_columnkey(self, column_key, value):
         self.ordered_columnkeys.add(column_key)
-        self.column_value[column_key] = value
+        self.column_values[column_key] = value
     
     def listMissingColumns(self):
         missing_cols = OrderedSet()
         
         for column_key, spec in self.column_spec.items():
-            value = self.column_value.get(column_key)
-            if spec.mandatory and not self.column_value.get(column_key):
+            value = self.column_values.get(column_key)
+            if spec.mandatory and not self.column_values.get(column_key):
                 # if for_saving and spec.default:
                 if spec.default:
-                    if hasattr(spec.default, '__call__'):
-                        default = spec.default()
-                    else:
-                        default = spec.default
-                    self.column_value[column_key] = default
+                    default = spec.get_default()
+                    self.column_values[column_key] = default
                     self.ordered_columnkeys.add(column_key)
                 elif not hasattr(self, 'targetmodel'):
                     missing_cols.add(column_key)
@@ -229,11 +231,14 @@ class BasicRow(RowDefaults):
         missing_cols = self.listMissingColumns()
         if for_saving and missing_cols:
             raise Exception("Columns %s mandatory but missing." % 
-                        [(ck,self.column_spec[ck]) for ck in missing_cols])
+                        ([(ck,self.column_spec[ck]) for ck in missing_cols],))
 
         for column_key in self.ordered_columnkeys:
             spec = self.get_spec_for_columnkey(column_key)            
             value = self.get_value_for_columnkey(column_key)
+            
+            if for_saving:
+                value = spec.value_for_saving(value)
             
             if value:
                 column_key, value = getattr(spec, access_mode)(column_key, value)
@@ -252,15 +257,20 @@ class BasicRow(RowDefaults):
         return self.ordered_columnkeys
 
     def values(self):
-        return [self.column_value[x] for x in self.ordered_columnkeys]
+        return [self.column_values[x] for x in self.ordered_columnkeys]
 
     def iterkeys(self):
-        return ( (x, self.column_value[x]) for x in self.ordered_columnkeys)
+        return ( (x, self.column_values[x]) for x in self.ordered_columnkeys)
     
     def itervalues(self):
-        return (self.column_value[x] for x in self.ordered_columnkeys)
+        return (self.column_values[x] for x in self.ordered_columnkeys)
 
 # ----- Change Data -----
+
+    def update(self, *args, **kwargs):
+        access_mode = kwargs.pop('access_mode', 'to_internal')
+    
+        return self._update(access_mode=access_mode, *args, **kwargs)
 
     def _update(self, *args, **kwargs):        
         access_mode = kwargs.pop('access_mode', 'to_identity')
@@ -286,7 +296,7 @@ class BasicRow(RowDefaults):
         spec = self.get_spec_for_columnkey(column_key)
         if spec.mandatory:
             raise 'Trying to delete mandatory column %s' % (column_key,)
-        del self.column_value[column_key]
+        del self.column_values[column_key]
 
 # ----- Load Data -----
 
@@ -316,9 +326,12 @@ class BasicRow(RowDefaults):
     @classmethod
     def load_multi(cls, ordered=True, *args, **kwargs):
         unordered = {}
+        if not kwargs['keys']:
+            raise StopIteration
         for row_key, columns in cls.multiget_slice(*args, **kwargs):
             columns = OrderedDict(columns)
             columns['row_key'] = row_key
+            columns['access_mode'] = 'to_identity'
             if not ordered:
                 yield cls( **columns )
             else:
@@ -328,14 +341,12 @@ class BasicRow(RowDefaults):
             raise StopIteration
             
         for row_key in kwargs['keys']:
-            yield cls( **unordered[row_key] )
+            blah = unordered.get(row_key)
+            yield cls( **blah )
     
     def load(self, *args, **kwargs):
         if not self.row_key and self._row_key_spec.default:
-            if callable(self._row_key_spec.default):
-                self.row_key = self._row_key_spec.default()
-            else:
-                self.row_key = self._row_key_spec.default                
+                self.row_key = self._row_key_spec.get_default()
         assert self.row_key, 'No row_key and no non-null non-empty keys argument. Did you use the right row_key_name?'
         load_subkeys = kwargs.pop('load_subkeys', False)
         tkeys = [self.row_key]
@@ -344,6 +355,9 @@ class BasicRow(RowDefaults):
         assert len(data) == 1
         self._update(data[0][1])
         # return data[0][1]
+        
+        self._beenloaded = True
+        
         if load_subkeys:
             return self.loadIterValues()
         return self
@@ -376,24 +390,29 @@ class BasicRow(RowDefaults):
             if self._row_key_spec.autogenerate:
                 self.generate_row_key()
             elif self._row_key_spec.default:
-                if callable(self._row_key_spec.default):
-                    self.row_key = self._row_key_spec.default()
-                else:
-                    self.row_key = self._row_key_spec.default
+                self.row_key = self._row_key_spec.get_default()
             else:
                 raise Exception('No row_key set!')
         
         for save_row_key in itertools.chain((self.row_key,), self.mirrors):
+            if callable(save_row_key):
+                save_row_key = save_row_key()
             self._real_save(save_row_key=save_row_key, *args, **kwargs)
+        
+        for hook in self.save_hooks:
+            hook(self)
+        
+        self._beensaved = True
         
         return self
         
     def _real_save(self, save_row_key=None, *args, **kwargs):
         save_columns = []
         for column_key, value in self.yield_column_key_value_pairs(for_saving=True):
+            assert isinstance(value, basestring), 'Not basestring %s:%s (%s)' % (column_key, type(value), type(self))
             column = Column(name=column_key, value=value, timestamp=self._timestamp_func())
             save_columns.append( ColumnOrSuperColumn(column=column) )
-                
+        
         self._client.batch_insert(keyspace         = str(self._keyspace),
                                  key              = save_row_key,
                                  cfmap            = {self._column_family: save_columns},
@@ -424,9 +443,6 @@ class DictRow(BasicRow):
     """Row with a public dictionary interface to set and get columns."""
     __abstract__ = True
     
-    def init(self, *args, **kwargs):
-        self.update(*args, **kwargs)
-    
     def __getitem__(self, column_key):
         value = self.get(column_key)
         if value is None:
@@ -436,45 +452,62 @@ class DictRow(BasicRow):
     def __setitem__(self, column_key, value):
         self.update( [(column_key, value)] )
 
-    def get(self, column_key, default=None):
+    def get(self, column_key, default=None, **kwargs):
+        access_mode = kwargs.pop('access_mode', 'to_external')
+        
         spec = self.get_spec_for_columnkey(column_key)
         value = self.get_value_for_columnkey(column_key)
         if value:
-            value = spec.value_to_external(value)
+            value = getattr(spec, 'value_' + access_mode)(value)
         else:
             value = default
         return value
 
-    @property
-    def update(self):
-        return functools.partial(self._update, access_mode='to_internal')
+class Model(DictRow):
+    _auto_timestamp = True
+    __abstract__ = True
+    
+    @classmethod
+    def _init_class(cls):
+        super(Model, cls)._init_class()
+        if cls._auto_timestamp:
+            cls.created_at = TimeField(autoset_on_create=True)
+            cls.last_modified = TimeField(autoset_on_save=True)    
 
-Model = DictRow
-
-class Index(BasicRow):
+class Index(DictRow):
     """A row which doesn't care about column names, and that can be appended to."""
     __abstract__ = True
     _default_field = None
     _ordered = True
 
     def is_unique(self, target):
+        if self.targetmodel.compare_with != 'TimeUUIDType':
+            return True
+            
         MAXCOUNT = 20000000
         self.load(count=MAXCOUNT) # XXX: we will blow up here at some point
                                   # i don't know where the real limit is yet.
-        assert len(self.column_value) < MAXCOUNT - 1, 'Too many keys to enforce sorted uniqueness!'
+        assert len(self.column_values) < MAXCOUNT - 1, 'Too many keys to enforce sorted uniqueness!'
         mytarget = self.targetmodel.value_to_internal(target)
         if mytarget in self.itervalues():
             return False
         return True
         
+    def get_next_column_key(self):
+        # if self.targetmodel.compare_with == 'TimeUUIDType':
+        return uuid.uuid1().bytes
+        raise AttributeError("%s %s No auto-ordering except for TimeUUID supported." % (self, self.targetmodel))
+        
     def append(self, target):
-        if self.targetmodel.unique and not self.is_unique(target):
+        if self.targetmodel.compare_with == 'TimeUUIDType' and \
+            self.targetmodel.unique and not self.is_unique(target):
             return self
             
         target = self.targetmodel.value_to_internal(target)
+        
+        column_key = self.get_next_column_key()
 
-        newuuid = uuid.uuid1().bytes
-        self._update( [(newuuid, target)] )
+        self._update( [(column_key, target)] )
         return self
 
     def loadIterItems(self):
@@ -492,21 +525,3 @@ class Index(BasicRow):
         for row_key in self.itervalues():
             yield self.targetmodel.foreign_class(row_key=row_key)
 
-# class TimeSortedIndex(Index):
-#     __abstract__ = True
-#     _compare_with = 'TimeUUIDType'
-#     
-# class TimeSortedUniqueIndex(Index):
-#     __abstract__ = True
-#     _compare_with = 'TimeUUIDType'
-#     
-#     def append(self, target):
-#         MAXCOUNT = 20000000
-#         self.load(count=MAXCOUNT) # XXX: we will blow up here at some point
-#                                   # i don't know where the real limit is yet.
-#         assert len(self.column_value) < MAXCOUNT - 1, 'Too many keys to enforce sorted uniqueness!'
-#         mytarget = self._default_field.value_to_internal(target)
-#         if mytarget in self.itervalues():
-#             return self
-#         else:
-#             return super(Index, self).append(target)
