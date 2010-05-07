@@ -30,7 +30,6 @@ from thrift.protocol import TBinaryProtocol
 from cassandra import Cassandra
 
 from .util import unhandled_exception_handler
-from .hierarchy import cmcache
 from .exceptions import NoServerAvailable
 
 __all__ = ['connect', 'connect_thread_local', 'NoServerAvailable']
@@ -82,7 +81,6 @@ def connect(servers=None, framed_transport=False, timeout=None):
     if servers is None:
         servers = [DEFAULT_SERVER]
     client = SingleConnection(servers, framed_transport, timeout)
-    cmcache.append('clients', client)
     return client
 
 def connect_thread_local(servers=None, round_robin=True, framed_transport=False, timeout=None):
@@ -126,6 +124,11 @@ class SingleConnection(object):
         self._client = None
         self._framed_transport = framed_transport
         self._timeout = timeout
+        self._keyspace_set = False
+
+    def set_keyspace(self, keyspace):
+        self.__getattr__('set_keyspace')(keyspace)
+        self._keyspace_set = True
 
     def __getattr__(self, attr):
         def client_call(*args, **kwargs):
@@ -150,7 +153,7 @@ class SingleConnection(object):
                 raise NoServerAvailable()
             except:
                 unhandled_exception_handler()
-                print args, kwargs
+                raise
 
         setattr(self, attr, client_call)
         return getattr(self, attr)
@@ -176,6 +179,7 @@ class ThreadLocalConnection(object):
         self._round_robin = round_robin
         self._framed_transport = framed_transport
         self._timeout = timeout
+        self._keyspace_set = False
 
     def __getattr__(self, attr):
         def client_call(*args, **kwargs):

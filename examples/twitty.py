@@ -1,4 +1,3 @@
-import tragedy
 from tragedy import *
 
 dev_cluster  = Cluster('Dev Cluster')
@@ -83,7 +82,8 @@ class FollowedBy(Index):
 #twitty_keyspace.verify_datamodel()
 # Ok, all set. Let's go!
 
-client = tragedy.connect(['localhost:9160'])
+# client = tragedy.connect(['localhost:9160'])
+twitty_keyspace.connect(['localhost:9160'])
 
 dave = User(username='dave', firstname='dave', password='test').save()
 merlin = User(username='merlin', firstname='merlin', password='sunshine').save()

@@ -21,7 +21,7 @@ def boot(keyspace=None):
     if not keyspace:
         import hierarchy
         keyspace = hierarchy.cmcache.retrieve('keyspaces')[0]
-    keyspace.verify_datamodel(fix=True)
+    keyspace.verify_datamodel(auto_create_model=True)
 
 keyspaceconf = """
 <ReplicaPlacementStrategy>org.apache.cassandra.locator.RackUnawareStrategy</ReplicaPlacementStrategy>

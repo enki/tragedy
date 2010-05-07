@@ -1,4 +1,3 @@
-from .connection import connect
 from .hierarchy import (Cluster,
                         Keyspace,
                        )
@@ -17,4 +16,3 @@ from .columns import (BooleanField,
                       AutoIndex,
 		      JSONField,
                      )
-from .hacks import boot

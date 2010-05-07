@@ -1,7 +1,9 @@
+from cassandra.ttypes import (KsDef,)
 from .datastructures import (OrderedDict,)
 from .util import (CASPATHSEP,
                    CrossModelCache,
                   )
+from . import connection
 
 cmcache = CrossModelCache()
 
@@ -24,20 +26,11 @@ class Cluster(object):
     def __init__(self, name):
         self.keyspaces = OrderedDict()
         self.name = name
-        self._client = None
         
         cmcache.append('clusters', self)
     
     def setclient(self, client):
         self._client = client
-    
-    def getclient(self):
-        if not self._client:
-            clients = cmcache.retrieve('clients')
-            if clients and clients[0]:
-                self._client = clients[0]
-        assert self._client, 'No Client set for Cluster or dependents.'
-        return self._client
     
     def registerKeyspace(self, name, keyspc):
         self.keyspaces[name] = keyspc
@@ -50,12 +43,24 @@ class Keyspace(object):
         self.models = OrderedDict()
         self.name = name
         self.cluster = cluster
+        self._client = None
         cluster.registerKeyspace(self.name, self)
+        
+        self.strategy_class = 'org.apache.cassandra.locator.RackUnawareStrategy'
+        self.replication_factor = 1
         
         cmcache.append('keyspaces', self)
 
+    def connect(self, auto_create_model=False, *args, **kwargs):
+        self._client = connection.connect(*args, **kwargs)
+        if auto_create_model:
+            self.verify_datamodel(auto_create_model=auto_create_model)
+        if not self._client._keyspace_set:
+            self._client.set_keyspace(self.name)
+
     def getclient(self):
-        return self.cluster.getclient()
+        assert self._client, "Keyspace doesn't have a connection."
+        return self._client
 
     def path(self):
         return u'%s%s%s' % (self.cluster.name, CASPATHSEP, self.name)
@@ -67,22 +72,45 @@ class Keyspace(object):
         return self.name
 
     def register_keyspace_with_cassandra(self):
-        self.getclient().system_add_keyspace()
+        ksdef = KsDef(name=self.name, strategy_class=self.strategy_class,
+                      replication_factor=self.replication_factor,
+                      cf_defs=[x.asCfDef() for x in self.models.values()], # XXX: create columns at the same time
+                     )
+        self.getclient().system_add_keyspace(ksdef)
 
-    def verify_datamodel(self, fix=False):
+    def verify_datamodel(self, auto_create_model=False):
         for model in self.models.values():
-            self.verify_datamodel_for_model(model, fix=fix)
+            self.verify_datamodel_for_model(model, auto_create_model=auto_create_model)
     
-    @staticmethod
-    def verify_datamodel_for_model(cls, fix=False):
-        allkeyspaces = cls.getclient().describe_keyspaces()
-        if not cls._keyspace.name in allkeyspaces:
-            print "Cassandra doesn't know about keyspace %s (only %s)" % (cls._keyspace, allkeyspaces)
-            cls._keyspace.register_keyspace_with_cassandra()
-            raise NotImplementedError
-        mykeyspace = cls.getclient().describe_keyspace(cls._keyspace.name)
-        assert cls._column_family in mykeyspace.keys(), "Cassandra doesn't know about ColumnFamily '%s'. Update your config and restart?" % (cls._column_family,)
-        mycf = mykeyspace[cls._column_family]
-        assert cls._column_type == mycf['Type'], "Cassandra expects Column Type '%s' for ColumnFamily %s. Tragedy thinks it is '%s'." % (mycf['Type'], cls._column_family, cls._column_type)
+    @classmethod
+    def verify_datamodel_for_model(cls, model, auto_create_model=False):
+        cls.verify_keyspace_for_model(model, auto_create_model)
+        cls.verify_columnfamilies_for_model(model, auto_create_model)
+        
+    @classmethod
+    def verify_keyspace_for_model(cls, model, auto_create_model=False):
+        client = model.getclient()
+        allkeyspaces = client.describe_keyspaces()
+        if not model._keyspace.name in allkeyspaces:
+            print "Cassandra doesn't know about keyspace %s (only %s)" % (model._keyspace, allkeyspaces)
+            if auto_create_model:
+                print 'Creating...'
+                model._keyspace.register_keyspace_with_cassandra()
+    
+    @classmethod
+    def verify_columnfamilies_for_model(cls, model, auto_create_model=False):
+        client = model.getclient()
+        if not client._keyspace_set:
+            client.set_keyspace(model._keyspace.name)
+            
+        mykeyspace = client.describe_keyspace(model._keyspace.name)            
+        if not model._column_family in mykeyspace.keys():
+            print "Cassandra doesn't know about ColumnFamily '%s'." % (model._column_family,)
+            if auto_create_model:
+                print 'Creating...'
+                model.register_columnfamiliy_with_cassandra()
+                mykeyspace = client.describe_keyspace(model._keyspace.name)            
+        mycf = mykeyspace[model._column_family]
+        assert model._column_type == mycf['Type'], "Cassandra expects Column Type '%s' for ColumnFamily %s. Tragedy thinks it is '%s'." % (mycf['Type'], model._column_family, model._column_type)
         remotecw = mycf['CompareWith'].rsplit('.',1)[1]
-        assert cls._default_field.compare_with == remotecw, "Cassandra thinks ColumnFamily '%s' is sorted by '%s'. Tragedy thinks it is '%s'." % (cls._column_family, remotecw, cls._default_field.compare_with)
+        assert model._default_field.compare_with == remotecw, "Cassandra thinks ColumnFamily '%s' is sorted by '%s'. Tragedy thinks it is '%s'." % (model._column_family, remotecw, model._default_field.compare_with)

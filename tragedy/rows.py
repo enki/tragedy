@@ -3,7 +3,7 @@ import itertools
 import uuid
 from cassandra.ttypes import (Column, ColumnOrSuperColumn, ColumnParent,
     ColumnPath, ConsistencyLevel, NotFoundException, SlicePredicate,
-    SliceRange, SuperColumn)
+    SliceRange, SuperColumn, CfDef)
 
 from .datastructures import (OrderedSet,
                              OrderedDict,
@@ -60,6 +60,10 @@ class RowDefaults(object):
     
     # If our class configuration is incomplete, fill in defaults
     _column_type = 'Standard'
+    _comment = ''
+    _row_cache_size = 0
+    _preload_row_cache = False
+    _key_cache_size = 200000
 
     @classmethod
     def _init_class(cls):
@@ -82,6 +86,20 @@ class RowDefaults(object):
     @classmethod
     def _rcl(cls, alternative):
         return alternative if alternative else cls._read_consistency_level
+
+    @classmethod
+    def asCfDef(cls):
+        cfdef = CfDef(table=cls._keyspace.name, name=cls._column_family, column_type=cls._column_type, 
+                      comparator_type=cls._default_field.compare_with, comment=cls._comment,
+                      row_cache_size=cls._row_cache_size, preload_row_cache=cls._preload_row_cache, key_cache_size=cls._key_cache_size,
+                      )
+        return cfdef
+    
+    @classmethod
+    def register_columnfamiliy_with_cassandra(cls):
+        cfdef = cls.asCfDef()
+        cls.getclient().system_add_column_family(cfdef)
+        
 
 class BasicRow(RowDefaults):
     """Each sub-class represents exactly one ColumnFamily, and each instance exactly one Row."""
@@ -329,14 +347,15 @@ class BasicRow(RowDefaults):
     def multiget_slice(cls, keys=None, consistency_level=None, **kwargs):
         assert keys, 'Need a non-null non-empty keys argument.'
         predicate = cls.get_slice_predicate(**kwargs)
-        key_slices = cls.getclient().multiget_slice(      keyspace          = str(cls._keyspace),
+        key_slices = cls.getclient().multiget_slice(    #  keyspace          = str(cls._keyspace),
                                                       keys              = keys,
                                                       column_parent     = cls.column_parent(),
                                                       predicate         = predicate,
                                                       consistency_level=cls._rcl(consistency_level),
                                                      )
-        for row_key, columns in key_slices.iteritems():
-            yield row_key, [cls.decodeColumn(col) for col in columns]
+        if key_slices:
+            for row_key, columns in key_slices.iteritems():
+                yield row_key, [cls.decodeColumn(col) for col in columns]
         #     key, value = result[0], [(colOrSuper.column.name, colOrSuper.column.value) for \
         #                         colOrSuper in result[1]]
         #     yield key, value
@@ -376,7 +395,7 @@ class BasicRow(RowDefaults):
             column = Column(name=column_key, value=value, timestamp=self._timestamp_func())
             save_columns.append( ColumnOrSuperColumn(column=column) )
         
-        self.getclient().batch_insert(keyspace         = str(self._keyspace),
+        self.getclient().batch_insert(#keyspace         = str(self._keyspace),
                                  key              = save_row_key,
                                  cfmap            = {self._column_family: save_columns},
                                  consistency_level= self._wcl(kwargs['write_consistency_level']),
