@@ -170,13 +170,12 @@ class BasicRow(RowDefaults):
         for column_key, spec in self.column_spec.items():
             value = self.column_values.get(column_key)
             if spec.mandatory and not self.column_values.get(column_key):
-                # if for_saving and spec.default:
                 if spec.default:
                     default = spec.get_default()
                     self.column_values[column_key] = default
                     self.ordered_columnkeys.add(column_key)
-                elif not hasattr(self, 'targetmodel'):
-                    missing_cols.add(column_key)
+                # elif not hasattr(self, '_default_field'): # XXX: i think this was meant to check if self is an index?
+                #     missing_cols.add(column_key)
                 
             if value and column_key not in self.ordered_columnkeys:
                 raise TragedyException('Value set, but column_key not in ordered_columnkeys. WTF?')
@@ -442,29 +441,29 @@ class Index(DictRow):
     _ordered = True
 
     def is_unique(self, target):
-        if self.targetmodel.compare_with != 'TimeUUIDType':
+        if self._default_field.compare_with != 'TimeUUIDType':
             return True
             
         MAXCOUNT = 20000000
         self.load(count=MAXCOUNT) # XXX: we will blow up here at some point
                                   # i don't know where the real limit is yet.
         assert len(self.column_values) < MAXCOUNT - 1, 'Too many keys to enforce sorted uniqueness!'
-        mytarget = self.targetmodel.value_to_internal(target)
+        mytarget = self._default_field.value_to_internal(target)
         if mytarget in self.itervalues():
             return False
         return True
         
     def get_next_column_key(self):
-        # if self.targetmodel.compare_with == 'TimeUUIDType':
+        # if self._default_field.compare_with == 'TimeUUIDType':
         return uuid.uuid1().bytes
-        raise AttributeError("%s %s No auto-ordering except for TimeUUID supported." % (self, self.targetmodel))
+        raise AttributeError("%s %s No auto-ordering except for TimeUUID supported." % (self, self._default_field))
         
     def append(self, target):
-        if self.targetmodel.compare_with == 'TimeUUIDType' and \
-            self.targetmodel.unique and not self.is_unique(target):
+        if self._default_field.compare_with == 'TimeUUIDType' and \
+            self._default_field.unique and not self.is_unique(target):
             return self
             
-        target = self.targetmodel.value_to_internal(target)
+        target = self._default_field.value_to_internal(target)
         
         column_key = self.get_next_column_key()
 
@@ -476,7 +475,7 @@ class Index(DictRow):
 
     def loadIterValues(self):
         if self.values():
-            return self.targetmodel.foreign_class.load_multi(keys=self.values(), orderdata=self.keys())
+            return self._default_field.foreign_class.load_multi(keys=self.values(), orderdata=self.keys())
         return []
 
     def resolve(self):
@@ -484,5 +483,5 @@ class Index(DictRow):
 
     def __iter__(self):
         for row_key in self.itervalues():
-            yield self.targetmodel.foreign_class(row_key=row_key)
+            yield self._default_field.foreign_class(row_key=row_key)
 

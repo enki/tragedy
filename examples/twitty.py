@@ -64,24 +64,24 @@ class TweetsSent(Index):
     """An index is an ordered mapping from a RowKey to
        instances of a specific Model."""
     by_username = RowKey()
-    targetmodel = ForeignKey(foreign_class=Tweet, compare_with='TimeUUIDType')
+    _default_field = ForeignKey(foreign_class=Tweet, compare_with='TimeUUIDType')
 
 class TweetsReceived(Index):
     by_username = RowKey()
-    targetmodel = ForeignKey(foreign_class=Tweet, compare_with='TimeUUIDType')
+    _default_field = ForeignKey(foreign_class=Tweet, compare_with='TimeUUIDType')
 
 class Following(Index):
     username = RowKey()
-    targetmodel = ForeignKey(foreign_class=User, compare_with='TimeUUIDType', 
+    _default_field = ForeignKey(foreign_class=User, compare_with='TimeUUIDType', 
                              unique=True)    
 
 class FollowedBy(Index):
     username = RowKey()
-    targetmodel = ForeignKey(foreign_class=User, compare_with='TimeUUIDType',
+    _default_field = ForeignKey(foreign_class=User, compare_with='TimeUUIDType',
                              unique=True)
 
 # We're done with defining the Data Model. Let's verify that Cassandra agrees on the model!
-twitty_keyspace.verify_datamodel()
+#twitty_keyspace.verify_datamodel()
 # Ok, all set. Let's go!
 
 dave = User(username='dave', firstname='dave', password='test').save()

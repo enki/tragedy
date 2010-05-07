@@ -51,15 +51,16 @@ class Keyspace(object):
     def __str__(self):
         return self.name
 
-    def verify_datamodel(self):
+    def verify_datamodel(self, fix=False):
         for model in self.models.values():
-            self.verify_datamodel_for_model(model)
+            self.verify_datamodel_for_model(model, fix=fix)
     
     @staticmethod
-    def verify_datamodel_for_model(cls):
+    def verify_datamodel_for_model(cls, fix=False):
         allkeyspaces = cls._client.describe_keyspaces()
-        assert cls._keyspace.name in allkeyspaces, ("Cassandra doesn't know about " + 
-                                    "keyspace %s (only %s)" % (cls._keyspace, allkeyspaces))
+        if not cls._keyspace.name in allkeyspaces:
+            print "Cassandra doesn't know about keyspace %s (only %s)" % (cls._keyspace, allkeyspaces)
+            raise
         mykeyspace = cls._client.describe_keyspace(cls._keyspace.name)
         assert cls._column_family in mykeyspace.keys(), "Cassandra doesn't know about ColumnFamily '%s'. Update your config and restart?" % (cls._column_family,)
         mycf = mykeyspace[cls._column_family]
