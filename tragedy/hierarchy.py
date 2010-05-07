@@ -51,10 +51,10 @@ class Keyspace(object):
         
         cmcache.append('keyspaces', self)
 
-    def connect(self, auto_create_model=False, *args, **kwargs):
+    def connect(self, auto_create_models=False, *args, **kwargs):
         self._client = connection.connect(*args, **kwargs)
-        if auto_create_model:
-            self.verify_datamodel(auto_create_model=auto_create_model)
+        if auto_create_models:
+            self.verify_datamodel(auto_create_models=auto_create_models)
         if not self._client._keyspace_set:
             self._client.set_keyspace(self.name)
 
@@ -78,27 +78,27 @@ class Keyspace(object):
                      )
         self.getclient().system_add_keyspace(ksdef)
 
-    def verify_datamodel(self, auto_create_model=False):
+    def verify_datamodel(self, auto_create_models=False):
         for model in self.models.values():
-            self.verify_datamodel_for_model(model=model, auto_create_model=auto_create_model)
+            self.verify_datamodel_for_model(model=model, auto_create_models=auto_create_models)
     
     @classmethod
-    def verify_datamodel_for_model(cls, model, auto_create_model=False):
-        cls.verify_keyspace_for_model(model=model, auto_create_model=auto_create_model)
-        cls.verify_columnfamilies_for_model(model=model, auto_create_model=auto_create_model)
+    def verify_datamodel_for_model(cls, model, auto_create_models=False):
+        cls.verify_keyspace_for_model(model=model, auto_create_models=auto_create_models)
+        cls.verify_columnfamilies_for_model(model=model, auto_create_models=auto_create_models)
         
     @classmethod
-    def verify_keyspace_for_model(cls, model, auto_create_model=False):
+    def verify_keyspace_for_model(cls, model, auto_create_models=False):
         client = model.getclient()
         allkeyspaces = client.describe_keyspaces()
         if not model._keyspace.name in allkeyspaces:
             print "Cassandra doesn't know about keyspace %s (only %s)" % (model._keyspace, allkeyspaces)
-            if auto_create_model:
-                print 'Creating...', auto_create_model
+            if auto_create_models:
+                print 'Creating...', auto_create_models
                 model._keyspace.register_keyspace_with_cassandra()
     
     @classmethod
-    def verify_columnfamilies_for_model(cls, model, auto_create_model=False):
+    def verify_columnfamilies_for_model(cls, model, auto_create_models=False):
         client = model.getclient()
         if not client._keyspace_set:
             client.set_keyspace(model._keyspace.name)
@@ -106,7 +106,7 @@ class Keyspace(object):
         mykeyspace = client.describe_keyspace(model._keyspace.name)            
         if not model._column_family in mykeyspace.keys():
             print "Cassandra doesn't know about ColumnFamily '%s'." % (model._column_family,)
-            if auto_create_model:
+            if auto_create_models:
                 print 'Creating...'
                 model.register_columnfamiliy_with_cassandra()
                 mykeyspace = client.describe_keyspace(model._keyspace.name)            
