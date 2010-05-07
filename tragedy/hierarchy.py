@@ -2,10 +2,17 @@ from cassandra.ttypes import (KsDef,)
 from .datastructures import (OrderedDict,)
 from .util import (CASPATHSEP,
                    CrossModelCache,
+                   popmulti,
                   )
 from . import connection
 
 cmcache = CrossModelCache()
+
+possible_validate_args = (
+                          ('auto_create_models', False),
+                          ('auto_drop_keyspace', False),
+                          ('auto_drop_columnfamilies', False),
+                         )
 
 class InventoryType(type):
     """This keeps inventory of the models created, and prepares the
@@ -14,11 +21,11 @@ class InventoryType(type):
         parents = [b for b in bases if isinstance(b, InventoryType)]
         new_cls = super(InventoryType, cls).__new__(cls, name, bases, attrs)
                 
-        if '__abstract__' in new_cls.__dict__:
+        if '__abstract__' in new_cls.__dict__: 
             return new_cls
-        
-        new_cls._init_class()
-        new_cls._keyspace.register_model(getattr(new_cls, '_column_family', name), new_cls)
+        else: # we're not abstract -> we're user defined and stored in the db
+            new_cls._init_class()
+            new_cls._keyspace.register_model(getattr(new_cls, '_column_family', name), new_cls)
 
         return new_cls
 
@@ -44,6 +51,7 @@ class Keyspace(object):
         self.name = name
         self.cluster = cluster
         self._client = None
+        self._first_iteration_in_this_cycle = False
         cluster.registerKeyspace(self.name, self)
         
         self.strategy_class = 'org.apache.cassandra.locator.RackUnawareStrategy'
@@ -51,10 +59,12 @@ class Keyspace(object):
         
         cmcache.append('keyspaces', self)
 
-    def connect(self, auto_create_models=False, *args, **kwargs):
+    def connect(self, *args, **kwargs):
+        newkwargs = popmulti(kwargs, *possible_validate_args )
         self._client = connection.connect(*args, **kwargs)
-        if auto_create_models:
-            self.verify_datamodel(auto_create_models=auto_create_models)
+        if newkwargs['auto_create_models']:
+            self.verify_datamodel(**newkwargs)
+            
         if not self._client._keyspace_set:
             self._client.set_keyspace(self.name)
 
@@ -78,35 +88,54 @@ class Keyspace(object):
                      )
         self.getclient().system_add_keyspace(ksdef)
 
-    def verify_datamodel(self, auto_create_models=False):
+    def verify_datamodel(self, **kwargs):
+        self._first_iteration_in_this_cycle = True
         for model in self.models.values():
-            self.verify_datamodel_for_model(model=model, auto_create_models=auto_create_models)
+            self.verify_datamodel_for_model(model=model, **kwargs)
     
     @classmethod
-    def verify_datamodel_for_model(cls, model, auto_create_models=False):
-        cls.verify_keyspace_for_model(model=model, auto_create_models=auto_create_models)
-        cls.verify_columnfamilies_for_model(model=model, auto_create_models=auto_create_models)
+    def verify_datamodel_for_model(cls, model, **kwargs):
+        cls.verify_keyspace_for_model(model=model, **kwargs)
+        cls.verify_columnfamilies_for_model(model=model, **kwargs)
+        model._keyspace._first_iteration_in_this_cycle = False
         
     @classmethod
-    def verify_keyspace_for_model(cls, model, auto_create_models=False):
+    def verify_keyspace_for_model(cls, model, **kwargs):
+        first_iteration = model._keyspace._first_iteration_in_this_cycle
+        
         client = model.getclient()
         allkeyspaces = client.describe_keyspaces()
+        print 'GOT ALL KEYSPACES:', allkeyspaces
+        if first_iteration and model._keyspace.name in allkeyspaces and kwargs['auto_drop_keyspace']:
+            print 'Autodropping keyspace %s' % (model._keyspace,)
+            client.set_keyspace(model._keyspace.name) # this op requires auth
+            client.system_drop_keyspace(model._keyspace.name)            
+            allkeyspaces = client.describe_keyspaces()
+            print 'AFTERWARDS GOT ALL KEYSPACES:', allkeyspaces
+            
         if not model._keyspace.name in allkeyspaces:
             print "Cassandra doesn't know about keyspace %s (only %s)" % (model._keyspace, allkeyspaces)
-            if auto_create_models:
-                print 'Creating...', auto_create_models
+            if kwargs['auto_create_models']:
+                print 'Creating...', kwargs['auto_create_models']
                 model._keyspace.register_keyspace_with_cassandra()
     
     @classmethod
-    def verify_columnfamilies_for_model(cls, model, auto_create_models=False):
+    def verify_columnfamilies_for_model(cls, model, **kwargs):
+        first_iteration = model._keyspace._first_iteration_in_this_cycle
+        
         client = model.getclient()
         if not client._keyspace_set:
             client.set_keyspace(model._keyspace.name)
             
-        mykeyspace = client.describe_keyspace(model._keyspace.name)            
+        mykeyspace = client.describe_keyspace(model._keyspace.name)
+        if first_iteration and kwargs['auto_drop_columnfamilies']:
+            for cf in mykeyspace.keys():
+                print 'Dropping %s...' % (cf,)     
+                client.system_drop_column_family(model._keyspace.name, cf)
+            mykeyspace = client.describe_keyspace(model._keyspace.name)
         if not model._column_family in mykeyspace.keys():
             print "Cassandra doesn't know about ColumnFamily '%s'." % (model._column_family,)
-            if auto_create_models:
+            if kwargs['auto_create_models']:
                 print 'Creating...'
                 model.register_columnfamiliy_with_cassandra()
                 mykeyspace = client.describe_keyspace(model._keyspace.name)            

@@ -4,6 +4,12 @@ import threading
 import time
 
 CASPATHSEP = ' -> '
+    
+def popntup(d, key, *args, **kwargs):
+    return (key, d.pop(key, *args, **kwargs))
+
+def popmulti(d, *args):
+    return dict( [popntup(d, arg[0], arg[1]) for arg in args] )
 
 def warn(msg):
     print 'WARN:', msg
