@@ -72,14 +72,25 @@ class Following(Index):
     username = RowKey()
     _default_field = ForeignKey(foreign_class=User, compare_with='TimeUUIDType', 
                              unique=True)    
-
 class FollowedBy(Index):
     username = RowKey()
     _default_field = ForeignKey(foreign_class=User, compare_with='TimeUUIDType',
                              unique=True)
 
+class PlanetNameByPosition(Index):
+    solarsystem = RowKey()
+    _default_field = StringField()
+
 twitty_keyspace.connect(servers=['localhost:9160'], auto_create_models=True, auto_drop_keyspace=True)
 
+sol = PlanetNameByPosition('sol')
+sol[1] = 'Mercury'
+sol[2] = 'Venus'
+print sol
+sol.save()
+
+import sys
+sys.exit()
 dave = User(username='dave', firstname='dave', password='test').save()
 merlin = User(username='merlin', firstname='merlin', password='sunshine').save()
 peter = User(username='peter', firstname='Peter', password='secret').save()

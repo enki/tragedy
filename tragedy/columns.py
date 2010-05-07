@@ -59,11 +59,13 @@ class ConvertAPI(object):
 class Field(ConvertAPI):
     compare_with = 'BytesType'
 
-class IdentityField(Field):
-    pass
+class ByteField(Field):
+    def key_to_internal(self, column_key):
+        return str(column_key)
 
 class StringField(Field):
-    pass
+    def key_to_internal(self, column_key):
+        return unicode(column_key)
 
 class TimeField(Field):    
     def __init__(self, *args, **kwargs):

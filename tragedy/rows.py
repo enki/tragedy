@@ -16,7 +16,7 @@ from .hierarchy import (InventoryType,
                        )    
 from .columns import (ConvertAPI,
                      Field,
-                     IdentityField,
+                     ByteField,
                      ForeignKey,
                      MissingField,
                      TimeField
@@ -105,7 +105,7 @@ class BasicRow(RowDefaults):
 
 # ----- INIT -----
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, row_key=None, *args, **kwargs):
         # Storage
         self.ordered_columnkeys = OrderedSet()
         self.column_values    = {}  #
@@ -115,14 +115,14 @@ class BasicRow(RowDefaults):
         self.mirrors = OrderedSet()
                 
         # Our Row Key
-        self.row_key = kwargs.pop('row_key', None)
+        self.row_key = row_key
         
         self._row_key_name = None
         self._row_key_spec = None
         
         # Extract the Columnspecs
         self.extract_specs_from_class()
-        
+                
         self.update(*args, **kwargs)
         self.init(*args, **kwargs)
     
@@ -176,6 +176,7 @@ class BasicRow(RowDefaults):
         return self.column_values.get(column_key)
 
     def set_value_for_columnkey(self, column_key, value):
+        assert isinstance(column_key, basestring), "Column Key needs to be a string."
         self.ordered_columnkeys.add(column_key)
         self.column_values[column_key] = value
     
@@ -209,6 +210,7 @@ class BasicRow(RowDefaults):
                         ([(ck,self.column_spec[ck]) for ck in missing_cols],))
 
         for column_key in self.ordered_columnkeys:
+            assert isinstance(column_key, basestring), 'Column Key not of type string?'
             spec = self.get_spec_for_columnkey(column_key)            
             value = self.get_value_for_columnkey(column_key)
             
@@ -453,7 +455,7 @@ class Model(DictRow):
 class Index(DictRow):
     """A row which doesn't care about column names, and that can be appended to."""
     __abstract__ = True
-    _default_field = None
+    _default_field = ByteField()
     _ordered = True
 
     def is_unique(self, target):
