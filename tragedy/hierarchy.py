@@ -94,7 +94,7 @@ class Keyspace(object):
         if not model._keyspace.name in allkeyspaces:
             print "Cassandra doesn't know about keyspace %s (only %s)" % (model._keyspace, allkeyspaces)
             if auto_create_model:
-                print 'Creating...'
+                print 'Creating...', auto_create_model
                 model._keyspace.register_keyspace_with_cassandra()
     
     @classmethod

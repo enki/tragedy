@@ -78,7 +78,7 @@ class FollowedBy(Index):
     _default_field = ForeignKey(foreign_class=User, compare_with='TimeUUIDType',
                              unique=True)
 
-twitty_keyspace.connect(['localhost:9160'])
+twitty_keyspace.connect(servers=['localhost:9160'])
 
 dave = User(username='dave', firstname='dave', password='test').save()
 merlin = User(username='merlin', firstname='merlin', password='sunshine').save()
