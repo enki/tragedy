@@ -58,24 +58,23 @@ class Tweet(Model):
     # def __repr__(self):
     #     return '<%s> %s' % (self['author']['username'], self['message'])
 
-class TweetsSent(Index):
+class TweetsSent(TimeOrderedIndex):
     """An index is an ordered mapping from a RowKey to
        instances of a specific Model."""
     by_username = RowKey()
-    _default_field = ForeignKey(foreign_class=Tweet, compare_with='TimeUUIDType')
+    _default_field = ForeignKey(foreign_class=Tweet)
 
-class TweetsReceived(Index):
+class TweetsReceived(TimeOrderedIndex):
     by_username = RowKey()
-    _default_field = ForeignKey(foreign_class=Tweet, compare_with='TimeUUIDType')
+    _default_field = ForeignKey(foreign_class=Tweet)
 
-class Following(Index):
+class Following(TimeOrderedIndex):
     username = RowKey()
-    _default_field = ForeignKey(foreign_class=User, compare_with='TimeUUIDType', 
-                             unique=True)    
-class FollowedBy(Index):
+    _default_field = ForeignKey(foreign_class=User, unique=True)
+
+class FollowedBy(TimeOrderedIndex):
     username = RowKey()
-    _default_field = ForeignKey(foreign_class=User, compare_with='TimeUUIDType',
-                             unique=True)
+    _default_field = ForeignKey(foreign_class=User, unique=True)
 
 class PlanetNameByPosition(Index):
     solarsystem = RowKey()
@@ -86,12 +85,10 @@ twitty_keyspace.connect(servers=['localhost:9160'], auto_create_models=True, aut
 sol = PlanetNameByPosition('sol')
 sol[1] = 'Mercury'
 sol[2] = 'Venus'
-sol.append('Earth')
+# sol.append('Earth')
 print sol
 sol.save()
 
-import sys
-sys.exit()
 dave = User(username='dave', firstname='dave', password='test').save()
 merlin = User(username='merlin', firstname='merlin', password='sunshine').save()
 peter = User(username='peter', firstname='Peter', password='secret').save()

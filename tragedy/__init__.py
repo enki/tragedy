@@ -2,9 +2,13 @@ from .hierarchy import (Cluster,
                         Keyspace,
                        )
 from .rows import (RowKey,
-                   Model,
-                   Index,
                    )
+
+from .models import (Model,
+                     Index,
+                     TimeOrderedIndex,
+                    )
+
 from .columns import (BooleanField,
                       ForeignKey,
                       UnicodeField,

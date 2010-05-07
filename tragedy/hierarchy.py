@@ -140,4 +140,4 @@ class Keyspace(object):
         mycf = mykeyspace[model._column_family]
         assert model._column_type == mycf['Type'], "Cassandra expects Column Type '%s' for ColumnFamily %s. Tragedy thinks it is '%s'." % (mycf['Type'], model._column_family, model._column_type)
         remotecw = mycf['CompareWith'].rsplit('.',1)[1]
-        assert model._sort_by == remotecw, "Cassandra thinks ColumnFamily '%s' is sorted by '%s'. Tragedy thinks it is '%s'." % (model._column_family, remotecw, model._sort_by)
+        assert model._order_by == remotecw, "Cassandra thinks ColumnFamily '%s' is sorted by '%s'. Tragedy thinks it is '%s'." % (model._column_family, remotecw, model._order_by)
