@@ -7,7 +7,7 @@ from .rows import (RowKey,
                    )
 from .columns import (BooleanField,
                       ForeignKey,
-                      StringField,
+                      UnicodeField,
                       IntegerField,
                       FloatField,
                       DictField,

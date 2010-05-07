@@ -24,6 +24,8 @@ from .columns import (ConvertAPI,
 
 from .exceptions import TragedyException
 
+known_sort_orders = ('BytesType', 'AsciiType', 'UTF8Type', 'LongType', 'LexicalUUIDType', 'TimeUUIDType')
+
 class RowKey(ConvertAPI):
     def __init__(self, *args, **kwargs):
         self.autogenerate = kwargs.pop('autogenerate', False)
@@ -58,6 +60,7 @@ class RowDefaults(object):
     
     # If our class configuration is incomplete, fill in defaults
     _column_type = 'Standard'
+    _sort_by = 'BytesType'
     _comment = ''
     _row_cache_size = 0
     _preload_row_cache = False
@@ -87,8 +90,9 @@ class RowDefaults(object):
 
     @classmethod
     def asCfDef(cls):
+        assert cls._sort_by in known_sort_orders, 'Unknown sort_by %s' % (cls._sort_by,)
         cfdef = CfDef(table=cls._keyspace.name, name=cls._column_family, column_type=cls._column_type, 
-                      comparator_type=cls._default_field.compare_with, comment=cls._comment,
+                      comparator_type=cls._sort_by, comment=cls._comment,
                       row_cache_size=cls._row_cache_size, preload_row_cache=cls._preload_row_cache, key_cache_size=cls._key_cache_size,
                       )
         return cfdef
@@ -459,7 +463,7 @@ class Index(DictRow):
     _ordered = True
 
     def is_unique(self, target):
-        if self._default_field.compare_with != 'TimeUUIDType':
+        if self._sort_by != 'TimeUUIDType':
             return True
             
         MAXCOUNT = 20000000
@@ -472,13 +476,12 @@ class Index(DictRow):
         return True
         
     def get_next_column_key(self):
-        # if self._default_field.compare_with == 'TimeUUIDType':
+        assert self._sort_by == 'TimeUUIDType', 'Append makes no sense for sort order %s' % (self._sort_by,)
         return uuid.uuid1().bytes
-        raise AttributeError("%s %s No auto-ordering except for TimeUUID supported." % (self, self._default_field))
         
     def append(self, target):
-        if self._default_field.compare_with == 'TimeUUIDType' and \
-            self._default_field.unique and not self.is_unique(target):
+        assert self._sort_by == 'TimeUUIDType', 'Append makes no sense for sort order %s' % (self._sort_by,)
+        if (self._default_field.unique and not self.is_unique(target)):
             return self
             
         target = self._default_field.value_to_internal(target)

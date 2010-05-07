@@ -105,13 +105,11 @@ class Keyspace(object):
         
         client = model.getclient()
         allkeyspaces = client.describe_keyspaces()
-        print 'GOT ALL KEYSPACES:', allkeyspaces
         if first_iteration and model._keyspace.name in allkeyspaces and kwargs['auto_drop_keyspace']:
             print 'Autodropping keyspace %s' % (model._keyspace,)
             client.set_keyspace(model._keyspace.name) # this op requires auth
             client.system_drop_keyspace(model._keyspace.name)            
             allkeyspaces = client.describe_keyspaces()
-            print 'AFTERWARDS GOT ALL KEYSPACES:', allkeyspaces
             
         if not model._keyspace.name in allkeyspaces:
             print "Cassandra doesn't know about keyspace %s (only %s)" % (model._keyspace, allkeyspaces)
@@ -142,4 +140,4 @@ class Keyspace(object):
         mycf = mykeyspace[model._column_family]
         assert model._column_type == mycf['Type'], "Cassandra expects Column Type '%s' for ColumnFamily %s. Tragedy thinks it is '%s'." % (mycf['Type'], model._column_family, model._column_type)
         remotecw = mycf['CompareWith'].rsplit('.',1)[1]
-        assert model._default_field.compare_with == remotecw, "Cassandra thinks ColumnFamily '%s' is sorted by '%s'. Tragedy thinks it is '%s'." % (model._column_family, remotecw, model._default_field.compare_with)
+        assert model._sort_by == remotecw, "Cassandra thinks ColumnFamily '%s' is sorted by '%s'. Tragedy thinks it is '%s'." % (model._column_family, remotecw, model._sort_by)

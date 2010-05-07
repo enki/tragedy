@@ -9,9 +9,9 @@ class User(Model):
     """A Model is stored and retrieved by its RowKey.
        Every Model has exactly one RowKey and one or more other Fields"""
     username  = RowKey()
-    firstname = StringField(mandatory=False)
-    lastname  = StringField(mandatory=False) # normally fields are mandatory
-    password  = StringField()
+    firstname = UnicodeField(mandatory=False)
+    lastname  = UnicodeField(mandatory=False) # normally fields are mandatory
+    password  = UnicodeField()
 
     def follow(self, *one_or_more):
         fol = Following(username=self)
@@ -47,7 +47,7 @@ class User(Model):
 
 class Tweet(Model):
     uuid    = RowKey(autogenerate=True) # generate a UUID for us.
-    message = StringField()    
+    message = UnicodeField()    
     author  = ForeignKey(foreign_class=User, mandatory=True)
 
     @staticmethod
@@ -79,13 +79,14 @@ class FollowedBy(Index):
 
 class PlanetNameByPosition(Index):
     solarsystem = RowKey()
-    _default_field = StringField()
+    _default_field = UnicodeField()
 
 twitty_keyspace.connect(servers=['localhost:9160'], auto_create_models=True, auto_drop_keyspace=True)
 
 sol = PlanetNameByPosition('sol')
 sol[1] = 'Mercury'
 sol[2] = 'Venus'
+sol.append('Earth')
 print sol
 sol.save()
 

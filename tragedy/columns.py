@@ -57,13 +57,17 @@ class ConvertAPI(object):
         return value
 
 class Field(ConvertAPI):
-    compare_with = 'BytesType'
-
-class ByteField(Field):
+    pass
+    
+class ByteField(Field):    
     def key_to_internal(self, column_key):
         return str(column_key)
 
-class StringField(Field):
+class AsciiField(Field):    
+    def key_to_internal(self, column_key):
+        return str(column_key)
+
+class UnicodeField(Field):    
     def key_to_internal(self, column_key):
         return unicode(column_key)
 
@@ -115,7 +119,6 @@ class ForeignKey(Field):
     def __init__(self, *args, **kwargs):
         self.foreign_class = kwargs.pop('foreign_class')
         self.resolve = kwargs.pop('resolve', False)
-        self.compare_with = kwargs.pop('compare_with', 'TimeUUIDType')
         self.unique = kwargs.pop('unique', False)
         super(ForeignKey, self).__init__(self, *args, **kwargs)
         
