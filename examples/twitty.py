@@ -1,5 +1,4 @@
 import tragedy
-client = tragedy.connect(['localhost:9160'])
 from tragedy import *
 
 dev_cluster  = Cluster('Dev Cluster')
@@ -83,6 +82,8 @@ class FollowedBy(Index):
 # We're done with defining the Data Model. Let's verify that Cassandra agrees on the model!
 #twitty_keyspace.verify_datamodel()
 # Ok, all set. Let's go!
+
+client = tragedy.connect(['localhost:9160'])
 
 dave = User(username='dave', firstname='dave', password='test').save()
 merlin = User(username='merlin', firstname='merlin', password='sunshine').save()

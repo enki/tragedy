@@ -24,9 +24,21 @@ class Cluster(object):
     def __init__(self, name):
         self.keyspaces = OrderedDict()
         self.name = name
+        self._client = None
         
         cmcache.append('clusters', self)
-        
+    
+    def setclient(self, client):
+        self._client = client
+    
+    def getclient(self):
+        if not self._client:
+            clients = cmcache.retrieve('clients')
+            if clients and clients[0]:
+                self._client = clients[0]
+        assert self._client, 'No Client set for Cluster or dependents.'
+        return self._client
+    
     def registerKeyspace(self, name, keyspc):
         self.keyspaces[name] = keyspc
         
@@ -42,6 +54,9 @@ class Keyspace(object):
         
         cmcache.append('keyspaces', self)
 
+    def getclient(self):
+        return self.cluster.getclient()
+
     def path(self):
         return u'%s%s%s' % (self.cluster.name, CASPATHSEP, self.name)
 
@@ -51,17 +66,21 @@ class Keyspace(object):
     def __str__(self):
         return self.name
 
+    def register_keyspace_with_cassandra(self):
+        self.getclient().system_add_keyspace()
+
     def verify_datamodel(self, fix=False):
         for model in self.models.values():
             self.verify_datamodel_for_model(model, fix=fix)
     
     @staticmethod
     def verify_datamodel_for_model(cls, fix=False):
-        allkeyspaces = cls._client.describe_keyspaces()
+        allkeyspaces = cls.getclient().describe_keyspaces()
         if not cls._keyspace.name in allkeyspaces:
             print "Cassandra doesn't know about keyspace %s (only %s)" % (cls._keyspace, allkeyspaces)
-            raise
-        mykeyspace = cls._client.describe_keyspace(cls._keyspace.name)
+            cls._keyspace.register_keyspace_with_cassandra()
+            raise NotImplementedError
+        mykeyspace = cls.getclient().describe_keyspace(cls._keyspace.name)
         assert cls._column_family in mykeyspace.keys(), "Cassandra doesn't know about ColumnFamily '%s'. Update your config and restart?" % (cls._column_family,)
         mycf = mykeyspace[cls._column_family]
         assert cls._column_type == mycf['Type'], "Cassandra expects Column Type '%s' for ColumnFamily %s. Tragedy thinks it is '%s'." % (mycf['Type'], cls._column_family, cls._column_type)

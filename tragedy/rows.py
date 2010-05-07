@@ -65,8 +65,11 @@ class RowDefaults(object):
     def _init_class(cls):
         cls._column_family = getattr(cls, '_column_family', cls.__name__)
         cls._keyspace = getattr(cls, '_keyspace', cmcache.retrieve('keyspaces')[0])
-        cls._client = getattr(cls, '_client', cmcache.retrieve('clients')[0])
         cls.save_hooks = OrderedSet()
+    
+    @classmethod
+    def getclient(cls):
+        return cls._keyspace.getclient()
     
     # Default Consistency levels that have overrides.
     _read_consistency_level=ConsistencyLevel.ONE
@@ -326,7 +329,7 @@ class BasicRow(RowDefaults):
     def multiget_slice(cls, keys=None, consistency_level=None, **kwargs):
         assert keys, 'Need a non-null non-empty keys argument.'
         predicate = cls.get_slice_predicate(**kwargs)
-        key_slices = cls._client.multiget_slice(      keyspace          = str(cls._keyspace),
+        key_slices = cls.getclient().multiget_slice(      keyspace          = str(cls._keyspace),
                                                       keys              = keys,
                                                       column_parent     = cls.column_parent(),
                                                       predicate         = predicate,
@@ -373,7 +376,7 @@ class BasicRow(RowDefaults):
             column = Column(name=column_key, value=value, timestamp=self._timestamp_func())
             save_columns.append( ColumnOrSuperColumn(column=column) )
         
-        self._client.batch_insert(keyspace         = str(self._keyspace),
+        self.getclient().batch_insert(keyspace         = str(self._keyspace),
                                  key              = save_row_key,
                                  cfmap            = {self._column_family: save_columns},
                                  consistency_level= self._wcl(kwargs['write_consistency_level']),
