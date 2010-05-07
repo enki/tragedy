@@ -22,8 +22,6 @@ from .columns import (ConvertAPI,
                      TimeField
                     )
 
-from .hacks import boot
-
 from .exceptions import TragedyException
 
 class RowKey(ConvertAPI):
@@ -108,10 +106,6 @@ class BasicRow(RowDefaults):
 # ----- INIT -----
 
     def __init__(self, *args, **kwargs):
-        # We're starting to go live - tell our hacks to check the db!
-        
-        boot()
-        
         # Storage
         self.ordered_columnkeys = OrderedSet()
         self.column_values    = {}  #
