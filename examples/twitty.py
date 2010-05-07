@@ -78,11 +78,6 @@ class FollowedBy(Index):
     _default_field = ForeignKey(foreign_class=User, compare_with='TimeUUIDType',
                              unique=True)
 
-# We're done with defining the Data Model. Let's verify that Cassandra agrees on the model!
-#twitty_keyspace.verify_datamodel()
-# Ok, all set. Let's go!
-
-# client = tragedy.connect(['localhost:9160'])
 twitty_keyspace.connect(['localhost:9160'])
 
 dave = User(username='dave', firstname='dave', password='test').save()

@@ -80,12 +80,12 @@ class Keyspace(object):
 
     def verify_datamodel(self, auto_create_model=False):
         for model in self.models.values():
-            self.verify_datamodel_for_model(model, auto_create_model=auto_create_model)
+            self.verify_datamodel_for_model(model=model, auto_create_model=auto_create_model)
     
     @classmethod
     def verify_datamodel_for_model(cls, model, auto_create_model=False):
-        cls.verify_keyspace_for_model(model, auto_create_model)
-        cls.verify_columnfamilies_for_model(model, auto_create_model)
+        cls.verify_keyspace_for_model(model=model, auto_create_model=auto_create_model)
+        cls.verify_columnfamilies_for_model(model=model, auto_create_model=auto_create_model)
         
     @classmethod
     def verify_keyspace_for_model(cls, model, auto_create_model=False):
