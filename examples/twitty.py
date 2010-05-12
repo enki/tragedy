@@ -101,8 +101,14 @@ sol[2] = 'Venus'
 sol.save()
 
 dave = User(username='dave', firstname='dave', password='test').save()
+
+bood = User(username='dave', firstname='dave', lastname='Bood', password='super').save()
+
 merlin = User(username='merlin', firstname='merlin', password='sunshine').save()
 peter = User(username='peter', firstname='Peter', password='secret').save()
+
+print list(User.by_firstname('dave').load().resolve())
+
 # 
 # dave.follow(merlin, peter)
 # peter.follow(merlin)
