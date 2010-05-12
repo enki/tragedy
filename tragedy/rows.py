@@ -3,7 +3,7 @@ import itertools
 import uuid
 from cassandra.ttypes import (Column, ColumnOrSuperColumn, ColumnParent,
     ColumnPath, ConsistencyLevel, NotFoundException, SlicePredicate,
-    SliceRange, SuperColumn, CfDef)
+    SliceRange, SuperColumn, CfDef, Mutation)
 
 from .datastructures import (OrderedSet,
                              OrderedDict,
@@ -399,11 +399,18 @@ class BasicRow(RowDefaults):
             column = Column(name=column_key, value=value, timestamp=self._timestamp_func())
             save_columns.append( ColumnOrSuperColumn(column=column) )
         
-        self.getclient().batch_insert(#keyspace         = str(self._keyspace),
-                                 key              = save_row_key,
-                                 cfmap            = {self._column_family: save_columns},
-                                 consistency_level= self._wcl(kwargs['write_consistency_level']),
-                                )
+        save_mutations = [Mutation(column_or_supercolumn=sc) for sc in save_columns]
+        
+        # self.getclient().batch_insert(#keyspace         = str(self._keyspace),
+        #                          key              = save_row_key,
+        #                          cfmap            = {self._column_family: save_columns},
+        #                          consistency_level= self._wcl(kwargs['write_consistency_level']),
+        #                         )
+        mumap = {save_row_key: {self._column_family: save_mutations} }
+        self.getclient().batch_mutate(
+                                      mutation_map=mumap,
+                                      consistency_level=self._wcl(kwargs['write_consistency_level']),
+                                     )
         
         # reset 'changed' - nothing's changed anymore
         self.column_changed.clear()
