@@ -26,7 +26,7 @@ class Model(DictRow):
     def _set_ownership_of_fields(cls):
         for key, value in cls.__dict__.items():
             if isinstance(value, BaseField):
-                value.set_owner(cls)
+                value.set_owner_and_name(cls, key)
     
     @classmethod
     def _init_stage_two(cls, *args, **kwargs):
@@ -41,12 +41,22 @@ class Model(DictRow):
                 class AutoIndexImplementation(TimeOrderedIndex):
                     _column_family = 'Auto_%s_%s' % (value.target.get_owner()._column_family, key)
                     _default_field = ForeignKey(foreign_class=value.target.get_owner(), unique=True)
+                    _index_name = key
+                    _target_name = value.target._name
+                
+                    @classmethod
+                    def target_saved(cls, target):
+                        # print 'AUTOSAVE', cls._column_family, cls._index_name, cls._target_name, target.row_key, target
+                        cls( target[cls._target_name] ).append(target).save()
                 
                 setattr(AutoIndexImplementation, value.target.get_owner()._column_family.lower(), RowKey())
                 print 'SETTING', cls, key, AutoIndexImplementation
-                # a = AutoIndexImplementation(key)
                 setattr(cls, key, AutoIndexImplementation)
                 print getattr(cls, key)
+                
+                if getattr(value, 'autosave', False):
+                    cls.save_hooks.add(AutoIndexImplementation.target_saved) 
+                
                     # _default_field = ForeignKey(foreign_class=cls, compare_with='TimeUUIDType')
             #         
             #         @classmethod
@@ -55,8 +65,6 @@ class Model(DictRow):
             #                                     
             #     # print 'CREATED', AutoIndexImplementation._column_family
             #     setattr(cls, key, AutoIndexImplementation)
-                # if getattr(value, 'autosave', False):
-                #     cls.save_hooks.add(AutoIndexImplementation.target_saved) 
 
 class Index(DictRow):
     """A row which doesn't care about column names, and that can be appended to."""

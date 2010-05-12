@@ -6,8 +6,9 @@ import simplejson as json
 from .exceptions import TragedyException
 
 class BaseField(object):
-    def set_owner(self, owner):
+    def set_owner_and_name(self, owner, name):
         self._owner = owner
+        self._name = name
     
     def get_owner(self):
         assert self._owner, "Owner can't be none!"
@@ -186,7 +187,7 @@ class CustomIndex(BaseField):
         self.target = target
 
 class SecondaryIndex(CustomIndex):
-    pass
+    autosave = True
             
 class SubIndex(CustomIndex):
     _order_by = 'BytesType'
