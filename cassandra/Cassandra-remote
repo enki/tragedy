@@ -28,12 +28,11 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '   multiget_slice( keys, ColumnParent column_parent, SlicePredicate predicate, ConsistencyLevel consistency_level)'
   print '  i32 get_count(string key, ColumnParent column_parent, SlicePredicate predicate, ConsistencyLevel consistency_level)'
   print '   multiget_count(string keyspace,  keys, ColumnParent column_parent, SlicePredicate predicate, ConsistencyLevel consistency_level)'
-  print '   get_range_slice(ColumnParent column_parent, SlicePredicate predicate, string start_key, string finish_key, i32 row_count, ConsistencyLevel consistency_level)'
   print '   get_range_slices(ColumnParent column_parent, SlicePredicate predicate, KeyRange range, ConsistencyLevel consistency_level)'
   print '  void insert(string key, ColumnParent column_parent, Column column, ConsistencyLevel consistency_level)'
-  print '  void batch_insert(string key,  cfmap, ConsistencyLevel consistency_level)'
   print '  void remove(string key, ColumnPath column_path, i64 timestamp, ConsistencyLevel consistency_level)'
   print '  void batch_mutate( mutation_map, ConsistencyLevel consistency_level)'
+  print '  void truncate(string keyspace, string cfname)'
   print '   describe_keyspaces()'
   print '  string describe_cluster_name()'
   print '  string describe_version()'
@@ -136,12 +135,6 @@ elif cmd == 'multiget_count':
     sys.exit(1)
   pp.pprint(client.multiget_count(args[0],eval(args[1]),eval(args[2]),eval(args[3]),eval(args[4]),))
 
-elif cmd == 'get_range_slice':
-  if len(args) != 6:
-    print 'get_range_slice requires 6 args'
-    sys.exit(1)
-  pp.pprint(client.get_range_slice(eval(args[0]),eval(args[1]),args[2],args[3],eval(args[4]),eval(args[5]),))
-
 elif cmd == 'get_range_slices':
   if len(args) != 4:
     print 'get_range_slices requires 4 args'
@@ -154,12 +147,6 @@ elif cmd == 'insert':
     sys.exit(1)
   pp.pprint(client.insert(args[0],eval(args[1]),eval(args[2]),eval(args[3]),))
 
-elif cmd == 'batch_insert':
-  if len(args) != 3:
-    print 'batch_insert requires 3 args'
-    sys.exit(1)
-  pp.pprint(client.batch_insert(args[0],eval(args[1]),eval(args[2]),))
-
 elif cmd == 'remove':
   if len(args) != 4:
     print 'remove requires 4 args'
@@ -171,6 +158,12 @@ elif cmd == 'batch_mutate':
     print 'batch_mutate requires 2 args'
     sys.exit(1)
   pp.pprint(client.batch_mutate(eval(args[0]),eval(args[1]),))
+
+elif cmd == 'truncate':
+  if len(args) != 2:
+    print 'truncate requires 2 args'
+    sys.exit(1)
+  pp.pprint(client.truncate(args[0],args[1],))
 
 elif cmd == 'describe_keyspaces':
   if len(args) != 0:
