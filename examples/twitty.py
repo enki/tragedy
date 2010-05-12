@@ -8,10 +8,14 @@ ALLTWEETS_KEY = '!ALLTWEETS!' # virtual user that receives all tweets
 class User(Model):
     """A Model is stored and retrieved by its RowKey.
        Every Model has exactly one RowKey and one or more other Fields"""
-    username  = RowKey()
+    userid    = RowKey(autogenerate=True)
+    username  = AsciiField()
     firstname = UnicodeField(mandatory=False)
     lastname  = UnicodeField(mandatory=False) # normally fields are mandatory
     password  = UnicodeField()
+
+    by_lastname = SecondaryIndex(lastname)
+    by_firstname = SecondaryIndex(firstname)
 
     def follow(self, *one_or_more):
         fol = Following(username=self)
@@ -49,6 +53,13 @@ class Tweet(Model):
     uuid    = RowKey(autogenerate=True) # generate a UUID for us.
     message = UnicodeField()    
     author  = ForeignKey(foreign_class=User, mandatory=True)
+    
+    # sent_by_user = AutoTimeOrderedIndex(author)
+    # 
+    # received_by_user = AutoTimeOrderedIndex(author)
+    # following = AutoTimeOrderedIndex(author)
+    # followed_by = AutoTimeOrderedIndex(author)
+    # by_message = AutoTimeOrderedIndex(message)
 
     @staticmethod
     def get_recent_tweets(*args, **kwargs):
@@ -86,24 +97,28 @@ sol = PlanetNameByPosition('sol')
 sol[1] = 'Mercury'
 sol[2] = 'Venus'
 # sol.append('Earth')
-print sol
+# print sol
 sol.save()
 
 dave = User(username='dave', firstname='dave', password='test').save()
-merlin = User(username='merlin', firstname='merlin', password='sunshine').save()
-peter = User(username='peter', firstname='Peter', password='secret').save()
-
-dave.follow(merlin, peter)
-peter.follow(merlin)
-merlin.follow(dave)
-
-merlin.tweet("i've just started using twitty. send me a message!")
-dave.tweet('making breakfast')
-peter.tweet('sitting at home being bored')
-
-for dude in (dave,peter,merlin):
-    name = dude['username']
-    print '%s has these followers:' % (name,), dude.get_followed_by().values()
-    print '%s follows' % (name,), dude.get_following().values()
-    print '%s sent' % (name,), [x for x in dude.get_tweets_sent(count=3)]
-    print '%s received' % (name,), [x for x in dude.get_tweets_received(count=3)]
+print User.by_firstname('dave').append(dave).save()
+print User.by_firstname('dave')
+print User.by_firstname('dave').load()
+# print User.by_firstname.keys()
+# merlin = User(username='merlin', firstname='merlin', password='sunshine').save()
+# peter = User(username='peter', firstname='Peter', password='secret').save()
+# 
+# dave.follow(merlin, peter)
+# peter.follow(merlin)
+# merlin.follow(dave)
+# 
+# merlin.tweet("i've just started using twitty. send me a message!")
+# dave.tweet('making breakfast')
+# peter.tweet('sitting at home being bored')
+# 
+# for dude in (dave,peter,merlin):
+#     name = dude['username']
+#     print '%s has these followers:' % (name,), dude.get_followed_by().values()
+#     print '%s follows' % (name,), dude.get_following().values()
+#     print '%s sent' % (name,), [x for x in dude.get_tweets_sent(count=3)]
+#     print '%s received' % (name,), [x for x in dude.get_tweets_received(count=3)]

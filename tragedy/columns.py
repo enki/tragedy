@@ -3,14 +3,24 @@ import uuid
 from . import timestamp
 from datetime import datetime
 import simplejson as json
+from .exceptions import TragedyException
 
-class ConvertAPI(object):
+class BaseField(object):
+    def set_owner(self, owner):
+        self._owner = owner
+    
+    def get_owner(self):
+        assert self._owner, "Owner can't be none!"
+        return self._owner
+
+class ConvertAPI(BaseField):
     default = False
     unique = False
+    _owner = None
     
     def __init__(self, *args, **kwargs):
         self.mandatory = kwargs.pop('mandatory', True)
-        
+    
     def to_internal(self, column_key, value):
         return self.key_to_internal(column_key), self.value_to_internal(value)
 
@@ -170,6 +180,15 @@ class JSONField(Field):
 DictField = JSONField
 ListField = JSONField
 
-class AutoIndex(object):
-    def __init__(self, *args, **kwargs):
-        self.autosave = kwargs.pop('autosave', True)
+class CustomIndex(BaseField):
+    _order_by = 'BytesType'
+    def __init__(self, target, *args, **kwargs):
+        self.target = target
+
+class SecondaryIndex(CustomIndex):
+    pass
+            
+class SubIndex(CustomIndex):
+    _order_by = 'BytesType'
+    def __init__(self, target, *args, **kwargs):
+        self.target = target

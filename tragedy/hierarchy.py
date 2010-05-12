@@ -24,8 +24,7 @@ class InventoryType(type):
         if '__abstract__' in new_cls.__dict__: 
             return new_cls
         else: # we're not abstract -> we're user defined and stored in the db
-            new_cls._init_class()
-            new_cls._keyspace.register_model(getattr(new_cls, '_column_family', name), new_cls)
+            new_cls._init_class(name=name)
 
         return new_cls
 
@@ -62,6 +61,10 @@ class Keyspace(object):
     def connect(self, *args, **kwargs):
         newkwargs = popmulti(kwargs, *possible_validate_args )
         self._client = connection.connect(*args, **kwargs)
+        
+        for model in self.models.values():
+            model._init_stage_two()
+        
         if newkwargs['auto_create_models']:
             self.verify_datamodel(**newkwargs)
             

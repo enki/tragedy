@@ -29,9 +29,6 @@ known_sort_orders = ('BytesType', 'AsciiType', 'UTF8Type', 'LongType', 'LexicalU
 class RowKey(ConvertAPI):
     def __init__(self, *args, **kwargs):
         self.autogenerate = kwargs.pop('autogenerate', False)
-        self.linked_from = kwargs.pop('linked_from', None)
-        self.by_funcname = kwargs.pop('by_funcname', None)
-        self.autoload_values = kwargs.pop('autoload_values', False)
         self.default = kwargs.pop('default', None)
     
     def value_to_internal(self, value):
@@ -67,10 +64,17 @@ class RowDefaults(object):
     _key_cache_size = 200000
 
     @classmethod
-    def _init_class(cls):
+    def _init_class(cls, name=None):
+        print 'OHAI', cls, getattr(cls, '_column_family', None)
+        assert name != None, "Name can't be None!"
         cls._column_family = getattr(cls, '_column_family', cls.__name__)
         cls._keyspace = getattr(cls, '_keyspace', cmcache.retrieve('keyspaces')[0])
         cls.save_hooks = OrderedSet()
+        cls._keyspace.register_model(getattr(cls, '_column_family', name), cls)
+    
+    @classmethod
+    def _init_stage_two(cls):
+        print 'STAGE 2', cls
     
     @classmethod
     def getclient(cls):
