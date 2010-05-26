@@ -7,6 +7,7 @@ from .columns import (ByteField,
                       BaseField,
                      )
 import uuid
+from .exceptions import TragedyException
 
 class Model(DictRow):
     _auto_timestamp = True
@@ -47,7 +48,14 @@ class Model(DictRow):
                     @classmethod
                     def target_saved(cls, target):
                         # print 'AUTOSAVE', cls._column_family, cls._index_name, cls._target_name, target.row_key, target
-                        cls( target[cls._target_name] ).append(target).save()
+                        seckey = target.get(cls._target_name)
+                        mandatory = getattr(target, cls._target_name).mandatory
+                        if seckey:
+                            cls( seckey ).append(target).save()
+                        elif (not seckey) and mandatory:
+                            raise TragedyException('Mandatory Secondary Field %s not present!' % (cls._target_name,))
+                        else:
+                            pass # not mandatory
                 
                 setattr(AutoIndexImplementation, value.target.get_owner()._column_family.lower(), RowKey())
                 print 'SETTING', cls, key, AutoIndexImplementation

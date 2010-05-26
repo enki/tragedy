@@ -14,7 +14,7 @@ class User(Model):
     lastname  = UnicodeField(mandatory=False) # normally fields are mandatory
     password  = UnicodeField()
 
-    # by_lastname = SecondaryIndex(lastname)
+    by_lastname = SecondaryIndex(lastname)
     by_firstname = SecondaryIndex(firstname)
 
     def follow(self, *one_or_more):
@@ -104,10 +104,10 @@ dave = User(username='dave', firstname='dave', password='test').save()
 
 bood = User(username='dave', firstname='dave', lastname='Bood', password='super').save()
 
-merlin = User(username='merlin', firstname='merlin', password='sunshine').save()
+merlin = User(username='merlin', firstname='merlin', lastname='Bood', password='sunshine').save()
 peter = User(username='peter', firstname='Peter', password='secret').save()
 
-print list(User.by_firstname('dave').load().resolve())
+print list(User.by_lastname('Bood').load().resolve())
 
 # 
 # dave.follow(merlin, peter)
