@@ -181,15 +181,17 @@ class JSONField(Field):
 DictField = JSONField
 ListField = JSONField
 
-class CustomIndex(BaseField):
+class ObjectIndex(BaseField):
     _order_by = 'BytesType'
+    allkey = None
     def __init__(self, target, *args, **kwargs):
         self.target = target
 
-class SecondaryIndex(CustomIndex):
+class SecondaryIndex(ObjectIndex):
     autosave = True
-            
-class SubIndex(CustomIndex):
-    _order_by = 'BytesType'
-    def __init__(self, target, *args, **kwargs):
-        self.target = target
+
+class AllIndex(ObjectIndex):
+    autosave = True
+    allkey = '!ALL!'
+    def __init__(self, *args, **kwargs):
+        self.target = self

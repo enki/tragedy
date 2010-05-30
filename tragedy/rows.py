@@ -30,6 +30,7 @@ class RowKey(ConvertAPI):
     def __init__(self, *args, **kwargs):
         self.autogenerate = kwargs.pop('autogenerate', False)
         self.default = kwargs.pop('default', None)
+        ConvertAPI.__init__(self, *args, **kwargs)
     
     def value_to_internal(self, value):
         if hasattr(value, 'row_key'):
@@ -332,6 +333,7 @@ class BasicRow(RowDefaults):
     def load(self, *args, **kwargs):
         if not self.row_key and self._row_key_spec.default:
                 self.row_key = self._row_key_spec.get_default()
+        # print self, dir(self), self._row_key_name
         assert self.row_key, 'No row_key and no non-null non-empty keys argument. Did you use the right row_key_name?'
         load_subkeys = kwargs.pop('load_subkeys', False)
         tkeys = [self.row_key]

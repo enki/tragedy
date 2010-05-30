@@ -1,7 +1,7 @@
 from .rows import DictRow, RowKey
 from .columns import (ByteField, 
                       TimeField,
-                      CustomIndex,
+                      ObjectIndex,
                       SecondaryIndex,
                       ForeignKey,
                       BaseField,
@@ -37,42 +37,44 @@ class Model(DictRow):
     @classmethod
     def _activate_autoindexes(cls):
         for key, value in cls.__dict__.items():
-            if isinstance(value, CustomIndex):
+            if isinstance(value, ObjectIndex):
                 print 'SCREAM', cls, key, value, value.target, 'Auto_%s_%s' % (value.target.get_owner()._column_family, key) 
-                class AutoIndexImplementation(TimeOrderedIndex):
+                class ObjectIndexImplementation(TimeOrderedIndex):
                     _column_family = 'Auto_%s_%s' % (value.target.get_owner()._column_family, key)
                     _default_field = ForeignKey(foreign_class=value.target.get_owner(), unique=True)
                     _index_name = key
                     _target_name = value.target._name
-                
+                    _allkey = getattr(value, 'allkey', None)
+                    
+                    def __init__(self, *args, **kwargs):
+                        TimeOrderedIndex.__init__(self, *args, **kwargs)
+                        if self._allkey and not self.row_key:
+                            self.row_key = self._allkey
+                    
                     @classmethod
                     def target_saved(cls, target):
-                        # print 'AUTOSAVE', cls._column_family, cls._index_name, cls._target_name, target.row_key, target
-                        seckey = target.get(cls._target_name)
-                        mandatory = getattr(target, cls._target_name).mandatory
-                        if seckey:
-                            cls( seckey ).append(target).save()
-                        elif (not seckey) and mandatory:
-                            raise TragedyException('Mandatory Secondary Field %s not present!' % (cls._target_name,))
+                        print 'AUTOSAVE', cls._column_family, cls._index_name, cls._target_name, target.row_key, target
+                        allkey = cls._allkey
+                        if allkey:
+                            print "ALLKEY", allkey, getattr(target, cls._target_name)
+                            cls(allkey).append(target).save()
                         else:
-                            pass # not mandatory
+                            seckey = target.get(cls._target_name)
+                            mandatory = getattr(getattr(target, cls._target_name), 'mandatory', False)
+                            if seckey:
+                                cls( seckey ).append(target).save()
+                            elif (not seckey) and mandatory:
+                                raise TragedyException('Mandatory Secondary Field %s not present!' % (cls._target_name,))
+                            else:
+                                pass # not mandatory
                 
-                setattr(AutoIndexImplementation, value.target.get_owner()._column_family.lower(), RowKey())
-                print 'SETTING', cls, key, AutoIndexImplementation
-                setattr(cls, key, AutoIndexImplementation)
+                setattr(ObjectIndexImplementation, value.target.get_owner()._column_family.lower(), RowKey())
+                print 'SETTING', cls, key, ObjectIndexImplementation
+                setattr(cls, key, ObjectIndexImplementation)
                 print getattr(cls, key)
                 
                 if getattr(value, 'autosave', False):
-                    cls.save_hooks.add(AutoIndexImplementation.target_saved) 
-                
-                    # _default_field = ForeignKey(foreign_class=cls, compare_with='TimeUUIDType')
-            #         
-            #         @classmethod
-            #         def target_saved(cls, target):
-            #             cls().append(target).save()
-            #                                     
-            #     # print 'CREATED', AutoIndexImplementation._column_family
-            #     setattr(cls, key, AutoIndexImplementation)
+                    cls.save_hooks.add(ObjectIndexImplementation.target_saved) 
 
 class Index(DictRow):
     """A row which doesn't care about column names, and that can be appended to."""

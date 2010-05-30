@@ -14,6 +14,7 @@ class User(Model):
     lastname  = UnicodeField(mandatory=False) # normally fields are mandatory
     password  = UnicodeField()
 
+    allusers = AllIndex()
     by_lastname = SecondaryIndex(lastname)
     by_firstname = SecondaryIndex(firstname)
 
@@ -107,7 +108,8 @@ bood = User(username='dave', firstname='dave', lastname='Bood', password='super'
 merlin = User(username='merlin', firstname='merlin', lastname='Bood', password='sunshine').save()
 peter = User(username='peter', firstname='Peter', password='secret').save()
 
-print list(User.by_lastname('Bood').load().resolve())
+# print list(User.by_lastname('Bood').load().resolve())
+print list(User.allusers().load().resolve())
 
 # 
 # dave.follow(merlin, peter)
