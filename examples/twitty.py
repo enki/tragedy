@@ -25,28 +25,28 @@ class User(Model):
     tweets_received = ObjectIndex(target_model='Tweet')
 
     def follow(self, *one_or_more):
-        fol = self.following(user=self)
+        fol = self.following()
         for other in one_or_more:
             fol.append(other)
-            self.followed_by(user=other).append(self).save()
+            other.followed_by().append(self).save()
         fol.save()
         # print "FOLLOW", fol, self.followed_by(user=other).load()
 
     def tweet(self, message):
         new_tweet = Tweet(author=self, message=message[:140]).save()
         # print 'wtf', new_tweet
-        a = self.tweets_sent(user=self)
+        a = self.tweets_sent()
         # print 'TWOP', a, a._row_key_name
         a.append( new_tweet ).save()
         # print 'FROB', a
 
-        for follower in self.followed_by(user=self).load():
+        for follower in self.followed_by().load():
             # print 'FOLLOWER', follower
             follower.receive(new_tweet)            
 
     def receive(self, tweet):
         # print self, 'RECEIVING', tweet
-        self.tweets_received(user=self).append(tweet).save()
+        self.tweets_received().append(tweet).save()
 
 class Tweet(Model):
     uuid    = RowKey(autogenerate=True) # generate a UUID for us.
@@ -55,11 +55,6 @@ class Tweet(Model):
     
     alltweets = AllIndex()
     
-    @staticmethod
-    def get_recent_tweets(*args, **kwargs):
-        tr = TweetsReceived(by_username=ALLTWEETS_KEY)
-        return tr.load(*args, **kwargs).loadIterValues()
-
 twitty_keyspace.connect(servers=['localhost:9160'], auto_create_models=True, auto_drop_keyspace=True)
 
 dave = User(username='dave', firstname='dave', password='test').save()
@@ -77,9 +72,9 @@ merlin.tweet("i've just started using twitty. send me a message!")
 dave.tweet('making breakfast')
 peter.tweet('sitting at home being bored')
 
-print list(User.allusers().load().resolve())
-print list(User.by_lastname('Bood').load().resolve())
-print list(dave.tweets_received(user=dave).load().resolve())
+print 'A', User.allusers(), list(User.allusers().load().resolve())
+print 'B', User.by_lastname('Bood'), list(User.by_lastname('Bood').load().resolve())
+print 'C', dave.tweets_received(), list(dave.tweets_received().load().resolve())
 
 # 
 # for dude in (dave,peter,merlin):

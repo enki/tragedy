@@ -336,6 +336,7 @@ class BasicRow(RowDefaults):
                 self.row_key = self._row_key_spec.get_default()
         # print self, dir(self), self._row_key_name
         assert self.row_key, 'No row_key and no non-null non-empty keys argument. Did you use the right row_key_name?'
+        assert isinstance(self.row_key, basestring), 'Row Key is of type %s should be basestring.' % (type(self.row_key,))
         load_subkeys = kwargs.pop('load_subkeys', False)
         tkeys = [self.row_key]
         

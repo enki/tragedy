@@ -15,6 +15,15 @@ class Model(DictRow):
     _auto_timestamp = True
     __abstract__ = True
     
+    def __init__(self, *args, **kwargs):
+        DictRow.__init__(self, *args, **kwargs)
+        for key, value in self.__class__.__dict__.items():
+            # print 'BLAH', key, GeneratedIndex in getattr(value, '__bases__', ())
+            if GeneratedIndex in getattr(value, '__bases__', ()) and \
+                   not getattr(value, '_default_key', None) and getattr(value, '_autosetrow', False):
+                # print 'OHAI INIT', self.__class__, key
+                value._default_key = self
+    
     @classmethod
     def _init_class(cls, *args, **kwargs):
         super(Model, cls)._init_class(*args, **kwargs)
@@ -46,24 +55,34 @@ class Model(DictRow):
                     target_fieldname = getattr(value.target_field, '_name', None)
                 else:
                     target_fieldname = None
-                class ObjectIndexImplementation(TimeOrderedIndex):
+                default_key = getattr(value, 'default_key', None)
+                autosetrow = getattr(value, 'autosetrow', False)
+                
+                class ObjectIndexImplementation(GeneratedIndex):
                     _column_family = 'Auto_%s_%s' % (cls._column_family, key)
                     _default_field = ForeignKey(foreign_class=default_field, unique=True)
                     _index_name = key
                     _target_fieldname = target_fieldname
-                    _allkey = getattr(value, 'allkey', None)
+                    _default_key = default_key
+                    _autosetrow = autosetrow
                     
                     def __init__(self, *args, **kwargs):
                         TimeOrderedIndex.__init__(self, *args, **kwargs)
-                        if self._allkey and not self.row_key:
-                            self.row_key = self._allkey
+                        
+                        if self._default_key and not self.row_key:
+                            if not isinstance(self._default_key, basestring):
+                                self.row_key = self._default_key.row_key
+                            else:
+                                self.row_key = self._default_key
                     
                     @classmethod
                     def target_saved(cls, instance):
                         # print 'AUTOSAVE', cls._column_family, cls._index_name, getattr(cls,'_target_fieldname', None), instance.row_key, instance
-                        allkey = cls._allkey
-                        if allkey:
-                            cls(allkey).append(instance).save()
+                        default_key = cls._default_key
+                        # print 'WORKING WITH', cls._column_family, cls._target_fieldname, default_key
+                        
+                        if default_key:
+                            cls(default_key).append(instance).save()
                         else:
                             seckey = instance.get(cls._target_fieldname)
                             mandatory = getattr(getattr(instance, cls._target_fieldname), 'mandatory', False)
@@ -139,3 +158,6 @@ class Index(DictRow):
 class TimeOrderedIndex(Index):
     __abstract__ = True
     _order_by = 'TimeUUIDType'
+
+class GeneratedIndex(TimeOrderedIndex):
+    __abstract__ = True
