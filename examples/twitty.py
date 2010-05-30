@@ -14,9 +14,11 @@ class User(Model):
     lastname  = UnicodeField(mandatory=False) # normally fields are mandatory
     password  = UnicodeField()
 
-    allusers = AllIndex()
-    by_lastname = SecondaryIndex(lastname)
-    by_firstname = SecondaryIndex(firstname)
+    # allusers = AllIndex()
+    # by_lastname = SecondaryIndex(lastname)
+    # by_firstname = SecondaryIndex(firstname)
+    
+    tweets_sent = ObjectIndex(target_model='Tweet')
 
     def follow(self, *one_or_more):
         fol = Following(username=self)
@@ -27,13 +29,19 @@ class User(Model):
 
     def tweet(self, message):
         new_tweet = Tweet(author=self, message=message[:140]).save()
-        TweetsSent(by_username=self).append(new_tweet).save()
-        
-        tr = TweetsReceived(by_username=ALLTWEETS_KEY)
-        tr.append(new_tweet).save()
-        
-        for follower in self.get_followed_by():
-            follower.receive(new_tweet)            
+        print 'wtf', new_tweet
+        a = self.tweets_sent(user=self)
+        print 'TWOP', a, a._row_key_name
+        a.append( new_tweet ).save()
+        print 'FROB', a
+        print list(self.tweets_sent(user=self).load().resolve())
+        # TweetsSent(by_username=self).append(new_tweet).save()
+        # 
+        # tr = TweetsReceived(by_username=ALLTWEETS_KEY)
+        # tr.append(new_tweet).save()
+        # 
+        # for follower in self.get_followed_by():
+        #     follower.receive(new_tweet)            
 
     def receive(self, tweet):
         TweetsReceived(by_username=self).append(tweet).save()
@@ -55,6 +63,8 @@ class Tweet(Model):
     message = UnicodeField()    
     author  = ForeignKey(foreign_class=User, mandatory=True)
     
+    # alltweets = AllIndex()
+    
     # sent_by_user = AutoTimeOrderedIndex(author)
     # 
     # received_by_user = AutoTimeOrderedIndex(author)
@@ -70,36 +80,36 @@ class Tweet(Model):
     # def __repr__(self):
     #     return '<%s> %s' % (self['author']['username'], self['message'])
 
-class TweetsSent(TimeOrderedIndex):
-    """An index is an ordered mapping from a RowKey to
-       instances of a specific Model."""
-    by_username = RowKey()
-    _default_field = ForeignKey(foreign_class=Tweet)
-
-class TweetsReceived(TimeOrderedIndex):
-    by_username = RowKey()
-    _default_field = ForeignKey(foreign_class=Tweet)
-
-class Following(TimeOrderedIndex):
-    username = RowKey()
-    _default_field = ForeignKey(foreign_class=User, unique=True)
-
-class FollowedBy(TimeOrderedIndex):
-    username = RowKey()
-    _default_field = ForeignKey(foreign_class=User, unique=True)
-
-class PlanetNameByPosition(Index):
-    solarsystem = RowKey()
-    _default_field = UnicodeField()
-
+# class TweetsSent(TimeOrderedIndex):
+#     """An index is an ordered mapping from a RowKey to
+#        instances of a specific Model."""
+#     by_username = RowKey()
+#     _default_field = ForeignKey(foreign_class=Tweet)
+# 
+# class TweetsReceived(TimeOrderedIndex):
+#     by_username = RowKey()
+#     _default_field = ForeignKey(foreign_class=Tweet)
+# 
+# class Following(TimeOrderedIndex):
+#     username = RowKey()
+#     _default_field = ForeignKey(foreign_class=User, unique=True)
+# 
+# class FollowedBy(TimeOrderedIndex):
+#     username = RowKey()
+#     _default_field = ForeignKey(foreign_class=User, unique=True)
+# 
+# class PlanetNameByPosition(Index):
+#     solarsystem = RowKey()
+#     _default_field = UnicodeField()
+# 
+# 
+# sol = PlanetNameByPosition('sol')
+# sol[1] = 'Mercury'
+# sol[2] = 'Venus'
+# # sol.append('Earth')
+# # print sol
+# sol.save()
 twitty_keyspace.connect(servers=['localhost:9160'], auto_create_models=True, auto_drop_keyspace=True)
-
-sol = PlanetNameByPosition('sol')
-sol[1] = 'Mercury'
-sol[2] = 'Venus'
-# sol.append('Earth')
-# print sol
-sol.save()
 
 dave = User(username='dave', firstname='dave', password='test').save()
 
@@ -108,8 +118,10 @@ bood = User(username='dave', firstname='dave', lastname='Bood', password='super'
 merlin = User(username='merlin', firstname='merlin', lastname='Bood', password='sunshine').save()
 peter = User(username='peter', firstname='Peter', password='secret').save()
 
+merlin.tweet("ohai")
+
 # print list(User.by_lastname('Bood').load().resolve())
-print list(User.allusers().load().resolve())
+# print list(User.allusers().load().resolve())
 
 # 
 # dave.follow(merlin, peter)

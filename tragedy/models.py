@@ -9,6 +9,8 @@ from .columns import (ByteField,
 import uuid
 from .exceptions import TragedyException
 
+from .hierarchy import cmcache
+
 class Model(DictRow):
     _auto_timestamp = True
     __abstract__ = True
@@ -38,12 +40,17 @@ class Model(DictRow):
     def _activate_autoindexes(cls):
         for key, value in cls.__dict__.items():
             if isinstance(value, ObjectIndex):
-                print 'SCREAM', cls, key, value, value.target, 'Auto_%s_%s' % (value.target.get_owner()._column_family, key) 
+                print 'SCREAM', cls, key, value, value.target_field, 'Auto_%s_%s' % (value.target_model._column_family, key) 
+                default_field = value.target_model
+                if value.target_field:
+                    target_fieldname = getattr(value.target_field, '_name', None)
+                else:
+                    target_fieldname = None
                 class ObjectIndexImplementation(TimeOrderedIndex):
-                    _column_family = 'Auto_%s_%s' % (value.target.get_owner()._column_family, key)
-                    _default_field = ForeignKey(foreign_class=value.target.get_owner(), unique=True)
+                    _column_family = 'Auto_%s_%s' % (cls._column_family, key)
+                    _default_field = ForeignKey(foreign_class=default_field, unique=True)
                     _index_name = key
-                    _target_name = value.target._name
+                    _target_fieldname = target_fieldname
                     _allkey = getattr(value, 'allkey', None)
                     
                     def __init__(self, *args, **kwargs):
@@ -52,23 +59,23 @@ class Model(DictRow):
                             self.row_key = self._allkey
                     
                     @classmethod
-                    def target_saved(cls, target):
-                        print 'AUTOSAVE', cls._column_family, cls._index_name, cls._target_name, target.row_key, target
+                    def target_saved(cls, instance):
+                        print 'AUTOSAVE', cls._column_family, cls._index_name, getattr(cls,'_target_fieldname', None), instance.row_key, instance
                         allkey = cls._allkey
                         if allkey:
-                            print "ALLKEY", allkey, getattr(target, cls._target_name)
-                            cls(allkey).append(target).save()
+                            cls(allkey).append(instance).save()
                         else:
-                            seckey = target.get(cls._target_name)
-                            mandatory = getattr(getattr(target, cls._target_name), 'mandatory', False)
+                            seckey = instance.get(cls._target_fieldname)
+                            mandatory = getattr(getattr(instance, cls._target_fieldname), 'mandatory', False)
                             if seckey:
-                                cls( seckey ).append(target).save()
+                                cls( seckey ).append(instance).save()
                             elif (not seckey) and mandatory:
-                                raise TragedyException('Mandatory Secondary Field %s not present!' % (cls._target_name,))
+                                raise TragedyException('Mandatory Secondary Field %s not present!' % (cls._target_fieldname,))
                             else:
                                 pass # not mandatory
                 
-                setattr(ObjectIndexImplementation, value.target.get_owner()._column_family.lower(), RowKey())
+                print 'OHAIFUCK TARGETMODEL', cls._column_family, value.target_model 
+                setattr(ObjectIndexImplementation, cls._column_family.lower(), RowKey())
                 print 'SETTING', cls, key, ObjectIndexImplementation
                 setattr(cls, key, ObjectIndexImplementation)
                 print getattr(cls, key)
@@ -103,9 +110,12 @@ class Index(DictRow):
         assert self._order_by == 'TimeUUIDType', 'Append makes no sense for sort order %s' % (self._order_by,)
         if (self._default_field.unique and not self.is_unique(target)):
             return self
-            
-        target = self._default_field.value_to_internal(target)
         
+        print 'APPENDCODE', target, self._default_field
+        assert isinstance(target, self._default_field.foreign_class), "Trying to store ForeignKey of wrong type!"
+        target = self._default_field.value_to_internal(target)
+        print 'SUPERTARGET', target, self._default_field.foreign_class, self._default_field.value_to_display(target)
+                
         column_key = self.get_next_column_key()
 
         self._update( [(column_key, target)] )

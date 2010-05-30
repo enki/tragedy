@@ -4,6 +4,7 @@ from . import timestamp
 from datetime import datetime
 import simplejson as json
 from .exceptions import TragedyException
+from .hierarchy import cmcache
 
 class BaseField(object):
     def set_owner_and_name(self, owner, name):
@@ -182,16 +183,41 @@ DictField = JSONField
 ListField = JSONField
 
 class ObjectIndex(BaseField):
-    _order_by = 'BytesType'
     allkey = None
-    def __init__(self, target, *args, **kwargs):
-        self.target = target
+    def __init__(self, target_model, *args, **kwargs):
+        self._target_model = target_model
+        self.target_field = None
+
+    def doresolve(self):
+        if isinstance(self._target_model, basestring):
+            for keyspace in cmcache.retrieve('keyspaces'):
+                for mname, model in keyspace.models.items():
+                    if mname == self._target_model:
+                        self._target_model = model
+                        break
+                if not isinstance(self._target_model, basestring):
+                    break
+
+    @property
+    def target_model(self):
+        self.doresolve()
+        return self._target_model
 
 class SecondaryIndex(ObjectIndex):
     autosave = True
+    def __init__(self, target_field, *args, **kwargs):
+        self.target_field = target_field
+
+    @property
+    def target_model(self):
+        return self.target_field.get_owner()
 
 class AllIndex(ObjectIndex):
     autosave = True
     allkey = '!ALL!'
     def __init__(self, *args, **kwargs):
-        self.target = self
+        self.target_field = self
+    
+    @property
+    def target_model(self):
+        return self.target_field.get_owner()
