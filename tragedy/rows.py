@@ -66,7 +66,7 @@ class RowDefaults(object):
 
     @classmethod
     def _init_class(cls, name=None):
-        print 'OHAI', cls, getattr(cls, '_column_family', None)
+        # print 'OHAI', cls, getattr(cls, '_column_family', None)
         assert name != None, "Name can't be None!"
         cls._column_family = getattr(cls, '_column_family', cls.__name__)
         cls._keyspace = getattr(cls, '_keyspace', cmcache.retrieve('keyspaces')[0])
@@ -75,7 +75,8 @@ class RowDefaults(object):
     
     @classmethod
     def _init_stage_two(cls):
-        print 'STAGE 2', cls
+        # print 'STAGE 2', cls
+        pass
     
     @classmethod
     def getclient(cls):

@@ -18,7 +18,7 @@ class Model(DictRow):
     @classmethod
     def _init_class(cls, *args, **kwargs):
         super(Model, cls)._init_class(*args, **kwargs)
-        print 'STAGE1', cls
+        # print 'STAGE1', cls
         if cls._auto_timestamp:
             cls.created_at = TimeField(autoset_on_create=True)
             cls.last_modified = TimeField(autoset_on_save=True)
@@ -40,7 +40,7 @@ class Model(DictRow):
     def _activate_autoindexes(cls):
         for key, value in cls.__dict__.items():
             if isinstance(value, ObjectIndex):
-                print 'SCREAM', cls, key, value, value.target_field, 'Auto_%s_%s' % (value.target_model._column_family, key) 
+                # print 'SCREAM', cls, key, value, value.target_field, 'Auto_%s_%s' % (value.target_model._column_family, key) 
                 default_field = value.target_model
                 if value.target_field:
                     target_fieldname = getattr(value.target_field, '_name', None)
@@ -60,7 +60,7 @@ class Model(DictRow):
                     
                     @classmethod
                     def target_saved(cls, instance):
-                        print 'AUTOSAVE', cls._column_family, cls._index_name, getattr(cls,'_target_fieldname', None), instance.row_key, instance
+                        # print 'AUTOSAVE', cls._column_family, cls._index_name, getattr(cls,'_target_fieldname', None), instance.row_key, instance
                         allkey = cls._allkey
                         if allkey:
                             cls(allkey).append(instance).save()
@@ -74,11 +74,11 @@ class Model(DictRow):
                             else:
                                 pass # not mandatory
                 
-                print 'OHAIFUCK TARGETMODEL', cls._column_family, value.target_model 
+                # print 'OHAIFUCK TARGETMODEL', cls._column_family, value.target_model 
                 setattr(ObjectIndexImplementation, cls._column_family.lower(), RowKey())
-                print 'SETTING', cls, key, ObjectIndexImplementation
+                # print 'SETTING', cls, key, ObjectIndexImplementation
                 setattr(cls, key, ObjectIndexImplementation)
-                print getattr(cls, key)
+                # print getattr(cls, key)
                 
                 if getattr(value, 'autosave', False):
                     cls.save_hooks.add(ObjectIndexImplementation.target_saved) 
@@ -111,10 +111,10 @@ class Index(DictRow):
         if (self._default_field.unique and not self.is_unique(target)):
             return self
         
-        print 'APPENDCODE', target, self._default_field
+        # print 'APPENDCODE', target, self._default_field
         assert isinstance(target, self._default_field.foreign_class), "Trying to store ForeignKey of wrong type!"
         target = self._default_field.value_to_internal(target)
-        print 'SUPERTARGET', target, self._default_field.foreign_class, self._default_field.value_to_display(target)
+        # print 'SUPERTARGET', target, self._default_field.foreign_class, self._default_field.value_to_display(target)
                 
         column_key = self.get_next_column_key()
 

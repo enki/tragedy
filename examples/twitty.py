@@ -14,101 +14,52 @@ class User(Model):
     lastname  = UnicodeField(mandatory=False) # normally fields are mandatory
     password  = UnicodeField()
 
-    # allusers = AllIndex()
-    # by_lastname = SecondaryIndex(lastname)
-    # by_firstname = SecondaryIndex(firstname)
+    allusers = AllIndex()
+    by_lastname = SecondaryIndex(lastname)
+    by_firstname = SecondaryIndex(firstname)
+
+    following = ObjectIndex(target_model='User')
+    followed_by = ObjectIndex(target_model='User')
     
     tweets_sent = ObjectIndex(target_model='Tweet')
+    tweets_received = ObjectIndex(target_model='Tweet')
 
     def follow(self, *one_or_more):
-        fol = Following(username=self)
+        fol = self.following(user=self)
         for other in one_or_more:
             fol.append(other)
-            FollowedBy(username=other).append(self).save()
+            self.followed_by(user=other).append(self).save()
         fol.save()
+        # print "FOLLOW", fol, self.followed_by(user=other).load()
 
     def tweet(self, message):
         new_tweet = Tweet(author=self, message=message[:140]).save()
-        print 'wtf', new_tweet
+        # print 'wtf', new_tweet
         a = self.tweets_sent(user=self)
-        print 'TWOP', a, a._row_key_name
+        # print 'TWOP', a, a._row_key_name
         a.append( new_tweet ).save()
-        print 'FROB', a
-        print list(self.tweets_sent(user=self).load().resolve())
-        # TweetsSent(by_username=self).append(new_tweet).save()
-        # 
-        # tr = TweetsReceived(by_username=ALLTWEETS_KEY)
-        # tr.append(new_tweet).save()
-        # 
-        # for follower in self.get_followed_by():
-        #     follower.receive(new_tweet)            
+        # print 'FROB', a
+
+        for follower in self.followed_by(user=self).load():
+            # print 'FOLLOWER', follower
+            follower.receive(new_tweet)            
 
     def receive(self, tweet):
-        TweetsReceived(by_username=self).append(tweet).save()
-
-    def get_followed_by(self, *args, **kwargs):
-        return FollowedBy(username=self).load(*args, **kwargs)
-
-    def get_following(self, *args, **kwargs):
-        return Following(username=self).load(*args, **kwargs)
-
-    def get_tweets_sent(self, *args, **kwargs):
-        return TweetsSent(by_username=self).load(*args, **kwargs).resolve()
-
-    def get_tweets_received(self, *args, **kwargs):
-        return TweetsSent(by_username=self).load(*args, **kwargs).resolve()
+        # print self, 'RECEIVING', tweet
+        self.tweets_received(user=self).append(tweet).save()
 
 class Tweet(Model):
     uuid    = RowKey(autogenerate=True) # generate a UUID for us.
     message = UnicodeField()    
     author  = ForeignKey(foreign_class=User, mandatory=True)
     
-    # alltweets = AllIndex()
+    alltweets = AllIndex()
     
-    # sent_by_user = AutoTimeOrderedIndex(author)
-    # 
-    # received_by_user = AutoTimeOrderedIndex(author)
-    # following = AutoTimeOrderedIndex(author)
-    # followed_by = AutoTimeOrderedIndex(author)
-    # by_message = AutoTimeOrderedIndex(message)
-
     @staticmethod
     def get_recent_tweets(*args, **kwargs):
         tr = TweetsReceived(by_username=ALLTWEETS_KEY)
         return tr.load(*args, **kwargs).loadIterValues()
 
-    # def __repr__(self):
-    #     return '<%s> %s' % (self['author']['username'], self['message'])
-
-# class TweetsSent(TimeOrderedIndex):
-#     """An index is an ordered mapping from a RowKey to
-#        instances of a specific Model."""
-#     by_username = RowKey()
-#     _default_field = ForeignKey(foreign_class=Tweet)
-# 
-# class TweetsReceived(TimeOrderedIndex):
-#     by_username = RowKey()
-#     _default_field = ForeignKey(foreign_class=Tweet)
-# 
-# class Following(TimeOrderedIndex):
-#     username = RowKey()
-#     _default_field = ForeignKey(foreign_class=User, unique=True)
-# 
-# class FollowedBy(TimeOrderedIndex):
-#     username = RowKey()
-#     _default_field = ForeignKey(foreign_class=User, unique=True)
-# 
-# class PlanetNameByPosition(Index):
-#     solarsystem = RowKey()
-#     _default_field = UnicodeField()
-# 
-# 
-# sol = PlanetNameByPosition('sol')
-# sol[1] = 'Mercury'
-# sol[2] = 'Venus'
-# # sol.append('Earth')
-# # print sol
-# sol.save()
 twitty_keyspace.connect(servers=['localhost:9160'], auto_create_models=True, auto_drop_keyspace=True)
 
 dave = User(username='dave', firstname='dave', password='test').save()
@@ -118,19 +69,18 @@ bood = User(username='dave', firstname='dave', lastname='Bood', password='super'
 merlin = User(username='merlin', firstname='merlin', lastname='Bood', password='sunshine').save()
 peter = User(username='peter', firstname='Peter', password='secret').save()
 
-merlin.tweet("ohai")
+dave.follow(merlin, peter)
+peter.follow(merlin)
+merlin.follow(dave)
 
-# print list(User.by_lastname('Bood').load().resolve())
-# print list(User.allusers().load().resolve())
+merlin.tweet("i've just started using twitty. send me a message!")
+dave.tweet('making breakfast')
+peter.tweet('sitting at home being bored')
 
-# 
-# dave.follow(merlin, peter)
-# peter.follow(merlin)
-# merlin.follow(dave)
-# 
-# merlin.tweet("i've just started using twitty. send me a message!")
-# dave.tweet('making breakfast')
-# peter.tweet('sitting at home being bored')
+print list(User.allusers().load().resolve())
+print list(User.by_lastname('Bood').load().resolve())
+print list(dave.tweets_received(user=dave).load().resolve())
+
 # 
 # for dude in (dave,peter,merlin):
 #     name = dude['username']
