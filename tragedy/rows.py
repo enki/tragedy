@@ -170,6 +170,8 @@ class BasicRow(RowDefaults):
     #     return self.set_value_for_columnkey(columnkey, internal_value)
 
     def __eq__(self, other):
+        if not other:
+            return not self.row_key
         return self.row_key == other.row_key
     
     def get_spec_for_columnkey(self, column_key):
@@ -200,12 +202,12 @@ class BasicRow(RowDefaults):
                     default = spec.get_default()
                     self.column_values[column_key] = default
                     self.ordered_columnkeys.add(column_key)
-                # elif not hasattr(self, '_default_field'): # XXX: i think this was meant to check if self is an index?
-                #     missing_cols.add(column_key)
+                else: #if not hasattr(self, '_default_field'): # XXX: i think this was meant to check if self is an index?
+                    missing_cols.add(column_key)
                 
             if value and column_key not in self.ordered_columnkeys:
                 raise TragedyException('Value set, but column_key not in ordered_columnkeys. WTF?')
-            
+        
         return missing_cols
     
     def isComplete(self):

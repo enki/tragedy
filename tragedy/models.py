@@ -2,6 +2,7 @@ from .rows import DictRow, RowKey
 from .columns import (ByteField, 
                       TimeField,
                       ObjectIndex,
+                      CustomIndex,
                       SecondaryIndex,
                       ForeignKey,
                       BaseField,
@@ -48,7 +49,9 @@ class Model(DictRow):
     @classmethod
     def _activate_autoindexes(cls):
         for key, value in cls.__dict__.items():
-            if isinstance(value, ObjectIndex):
+            if isinstance(value, CustomIndex):
+                pass
+            elif isinstance(value, ObjectIndex):
                 # print 'SCREAM', cls, key, value, value.target_field, 'Auto_%s_%s' % (value.target_model._column_family, key) 
                 default_field = value.target_model
                 if value.target_field:

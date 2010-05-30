@@ -182,6 +182,9 @@ class JSONField(Field):
 DictField = JSONField
 ListField = JSONField
 
+class CustomIndex(BaseField):
+    pass
+
 class ObjectIndex(BaseField):
     default_key = None
     autosetrow = True
@@ -208,12 +211,11 @@ class SecondaryIndex(ObjectIndex):
     autosave = True
     autosetrow = False
     def __init__(self, target_field, *args, **kwargs):
-        print 'SEC', self, target_field
         self.target_field = target_field
 
     @property
     def target_model(self):
-        print 'OWNER', self.target_field.get_owner()
+        # print 'OWNER', self.target_field.get_owner()
         return self.target_field.get_owner()
 
 class AllIndex(ObjectIndex):
