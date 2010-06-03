@@ -69,7 +69,9 @@ class RowDefaults(object):
         # print 'OHAI', cls, getattr(cls, '_column_family', None)
         assert name != None, "Name can't be None!"
         cls._column_family = getattr(cls, '_column_family', cls.__name__)
-        cls._keyspace = getattr(cls, '_keyspace', cmcache.retrieve('keyspaces')[0])
+        keyspaces = cmcache.retrieve('keyspaces')
+        assert keyspaces, 'No Keyspaces defined - make sure you define one before defining modules.'
+        cls._keyspace = getattr(cls, '_keyspace', keyspaces[0])
         cls.save_hooks = OrderedSet()
         cls._keyspace.register_model(getattr(cls, '_column_family', name), cls)
     
