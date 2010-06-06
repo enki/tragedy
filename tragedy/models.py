@@ -80,7 +80,7 @@ class Model(DictRow):
                     
                     @classmethod
                     def target_saved(cls, instance):
-                        # print 'AUTOSAVE', cls._column_family, cls._index_name, getattr(cls,'_target_fieldname', None), instance.row_key, instance
+                        print 'AUTOSAVE', cls._column_family, cls._index_name, getattr(cls,'_target_fieldname', None), instance.row_key, instance
                         default_key = cls._default_key
                         # print 'WORKING WITH', cls._column_family, cls._target_fieldname, default_key
                         
@@ -148,7 +148,7 @@ class Index(DictRow):
 
     def loadIterValues(self):
         if self.values():
-            return self._default_field.foreign_class.load_multi(keys=self.values(), orderdata=self.keys())
+            return self._default_field.foreign_class.load_multi(keys=self.values()) #orderdata=self.keys())
         return []
 
     def resolve(self):

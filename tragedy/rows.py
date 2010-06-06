@@ -66,10 +66,11 @@ class RowDefaults(object):
 
     @classmethod
     def _init_class(cls, name=None):
-        # print 'OHAI', cls, getattr(cls, '_column_family', None)
         assert name != None, "Name can't be None!"
         cls._column_family = getattr(cls, '_column_family', cls.__name__)
         keyspaces = cmcache.retrieve('keyspaces')
+        if not keyspaces:
+            print 'NO KEYSPACES?!?'
         assert keyspaces, 'No Keyspaces defined - make sure you define one before defining modules.'
         cls._keyspace = getattr(cls, '_keyspace', keyspaces[0])
         cls.save_hooks = OrderedSet()
@@ -160,17 +161,6 @@ class BasicRow(RowDefaults):
             raise TragedyException('need a name for the row key!')
 
 # ----- Access and convert data -----
-    
-    # def __getattr__(self, column_key):
-    #     spec = self.get_spec_for_columnkey(column_key)
-    #     value = self.get_value_for_columnkey(column_key)
-    #     return spec.value_to_external(value)
-    # 
-    # def __setattr__(self, column_key, value):
-    #     spec = self.get_spec_for_columnkey(column_key)
-    #     internal_value = spec.value_to_internal(value)
-    #     return self.set_value_for_columnkey(columnkey, internal_value)
-
     def __eq__(self, other):
         if not other:
             return not self.row_key
@@ -189,10 +179,15 @@ class BasicRow(RowDefaults):
             return self.row_key
         return self.column_values.get(column_key)
 
-    def set_value_for_columnkey(self, column_key, value):
+    def set_value_for_columnkey(self, column_key, value, dont_mark=False):
         assert isinstance(column_key, basestring), "Column Key needs to be a string."
         self.ordered_columnkeys.add(column_key)
         self.column_values[column_key] = value
+        
+        if dont_mark:
+            self.unmarkChanged(column_key)
+        else:
+            self.markChanged(column_key)
     
     def listMissingColumns(self):
         missing_cols = OrderedSet()
@@ -202,8 +197,7 @@ class BasicRow(RowDefaults):
             if spec.mandatory and not self.column_values.get(column_key):
                 if spec.default:
                     default = spec.get_default()
-                    self.column_values[column_key] = default
-                    self.ordered_columnkeys.add(column_key)
+                    self.set_value_for_columnkey(column_key, default)
                 else: #if not hasattr(self, '_default_field'): # XXX: i think this was meant to check if self is an index?
                     missing_cols.add(column_key)
                 
@@ -223,7 +217,11 @@ class BasicRow(RowDefaults):
             raise TragedyException("Columns %s mandatory but missing." % 
                         ([(ck,self.column_spec[ck]) for ck in missing_cols],))
 
+
         for column_key in self.ordered_columnkeys:
+            if for_saving:
+                if not (column_key in self.column_changed): # XXX: there are faster ways - profile?
+                    continue
             assert isinstance(column_key, basestring), 'Column Key not of type string?'
             spec = self.get_spec_for_columnkey(column_key)            
             value = self.get_value_for_columnkey(column_key)
@@ -265,6 +263,7 @@ class BasicRow(RowDefaults):
 
     def _update(self, *args, **kwargs):        
         access_mode = kwargs.pop('access_mode', 'to_identity')
+        for_loading = kwargs.pop('for_loading', False)
         
         tmp = OrderedDict()
         tmp.update(*args, **kwargs)
@@ -275,11 +274,14 @@ class BasicRow(RowDefaults):
                 continue
             spec = self.column_spec.get(column_key, self._default_field)
             column_key, value = getattr(spec, access_mode)(column_key, value)
-            self.set_value_for_columnkey(column_key, value)
-            self.markChanged(column_key)
+            self.set_value_for_columnkey(column_key, value, dont_mark=for_loading)
 
     def markChanged(self, column_key):
         self.column_changed[column_key] = True
+
+    def unmarkChanged(self, column_key):
+        if column_key in self.column_changed:
+            del self.column_changed[column_key]
 
     def delete(self, column_key):
         # XXX: keep track of delete
@@ -341,23 +343,23 @@ class BasicRow(RowDefaults):
         # print self, dir(self), self._row_key_name
         assert self.row_key, 'No row_key and no non-null non-empty keys argument. Did you use the right row_key_name?'
         assert isinstance(self.row_key, basestring), 'Row Key is of type %s should be basestring.' % (type(self.row_key,))
-        load_subkeys = kwargs.pop('load_subkeys', False)
+        # load_subkeys = kwargs.pop('load_subkeys', False)
         tkeys = [self.row_key]
         
         data = list(self.multiget_slice(keys=tkeys, *args, **kwargs))
         assert len(data) == 1
-        self._update(data[0][1])
+        self._update(data[0][1], for_loading=True)
         # return data[0][1]
         
-        self._beenloaded = True
-        
-        if load_subkeys:
-            return self.loadIterValues()
+        # if load_subkeys:
+        #     return self.loadIterValues()
         return self
         
     @classmethod
     def multiget_slice(cls, keys=None, consistency_level=None, **kwargs):
         assert keys, 'Need a non-null non-empty keys argument.'
+        print 'GETTING', cls, keys, kwargs
+        
         predicate = cls.get_slice_predicate(**kwargs)
         key_slices = cls.getclient().multiget_slice(    #  keyspace          = str(cls._keyspace),
                                                       keys              = keys,
@@ -404,7 +406,10 @@ class BasicRow(RowDefaults):
         save_columns = []
         for column_key, value in self.yield_column_key_value_pairs(for_saving=True):
             assert isinstance(value, basestring), 'Not basestring %s:%s (%s)' % (column_key, type(value), type(self))
-            column = Column(name=column_key, value=value, timestamp=self._timestamp_func())
+            newtimestamp = self._timestamp_func()
+            import time
+            print 'STORING WITH NEWTIMESTAMP', self.__class__, column_key, newtimestamp #time.ctime( int(newtimestamp) ) 
+            column = Column(name=column_key, value=value, timestamp=newtimestamp)
             save_columns.append( ColumnOrSuperColumn(column=column) )
         
         save_mutations = [Mutation(column_or_supercolumn=sc) for sc in save_columns]
@@ -447,7 +452,7 @@ class DictRow(BasicRow):
     def __getitem__(self, column_key):
         value = self.get(column_key)
         if value is None:
-            raise KeyError('No Value set for %s' % (column_key,))
+            raise KeyError('No Value set for %s (%s)' % (column_key, self._column_family))
         return value
     
     def __setitem__(self, column_key, value):

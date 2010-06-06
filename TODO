@@ -1,2 +1,6 @@
 auto-lowercase (and similar normalization operations) for secondary indexes?
 in-model non-foreignkey/object indexes?
+# XXX: keep track of delete
+# XXX: can't delete if default columnspec is 'mandatory'.
+
+Make sure verify_model gets called after all models have been defined.

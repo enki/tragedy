@@ -79,6 +79,7 @@ class Keyspace(object):
         return u'%s%s%s' % (self.cluster.name, CASPATHSEP, self.name)
 
     def register_model(self, name, model):
+        print 'REGISTER MODEL', name
         self.models[name] = model
 
     def __str__(self):
@@ -93,6 +94,7 @@ class Keyspace(object):
 
     def verify_datamodel(self, **kwargs):
         self._first_iteration_in_this_cycle = True
+        print 'VERIFY', kwargs
         for model in self.models.values():
             self.verify_datamodel_for_model(model=model, **kwargs)
     
