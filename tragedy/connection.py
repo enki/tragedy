@@ -124,11 +124,11 @@ class SingleConnection(object):
         self._client = None
         self._framed_transport = framed_transport
         self._timeout = timeout
-        self._keyspace_set = False
+        self._keyspace_set = None
 
     def set_keyspace(self, keyspace):
-        self.__getattr__('set_keyspace')(keyspace)
-        self._keyspace_set = True
+        # self.__getattr__('set_keyspace')(keyspace)
+        self._keyspace_set = keyspace
 
     def __getattr__(self, attr):
         def client_call(*args, **kwargs):
@@ -162,6 +162,8 @@ class SingleConnection(object):
         for server in self._servers:
             try:
                 self._client, self._transport = create_client_transport(server, self._framed_transport, self._timeout)
+                assert self._keyspace_set, 'No keyspace set before connect!'
+                self.__getattr__('set_keyspace')(self._keyspace_set)
                 return
             except (Thrift.TException, socket.timeout, socket.error), exc:
                 unhandled_exception_handler()
@@ -179,7 +181,7 @@ class ThreadLocalConnection(object):
         self._round_robin = round_robin
         self._framed_transport = framed_transport
         self._timeout = timeout
-        self._keyspace_set = False
+        self._keyspace_set = None
 
     def __getattr__(self, attr):
         def client_call(*args, **kwargs):
@@ -222,6 +224,8 @@ class ThreadLocalConnection(object):
         for server in servers:
             try:
                 self._local.client, self._local.transport = create_client_transport(server, self._framed_transport, self._timeout)
+                assert self._keyspace_set, 'No keyspace set before connect!'
+                self._local_client.__getattr__('set_keyspace')(self._keyspace_set)
                 return
             except (Thrift.TException, socket.timeout, socket.error), exc:
                 continue

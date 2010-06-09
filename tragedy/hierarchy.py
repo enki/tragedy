@@ -109,10 +109,10 @@ class Keyspace(object):
         first_iteration = model._keyspace._first_iteration_in_this_cycle
         
         client = model.getclient()
+        client.set_keyspace(model._keyspace.name) # this op requires auth
         allkeyspaces = client.describe_keyspaces()
         if first_iteration and model._keyspace.name in allkeyspaces and kwargs['auto_drop_keyspace']:
             print 'Autodropping keyspace %s' % (model._keyspace,)
-            client.set_keyspace(model._keyspace.name) # this op requires auth
             client.system_drop_keyspace(model._keyspace.name)            
             allkeyspaces = client.describe_keyspaces()
             
