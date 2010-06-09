@@ -2,8 +2,8 @@
 
 Tragedy is a high-level Cassandra Object Abstraction for Python.
 
-The current newindex branch is a failed attempt to make tragedy indexes more powerful.
-It'll however serve as the base for a more thorough refactor - don't rely on the API for now because it will change.
+The current newindex branch is a refactor to make tragedy indexes more powerful.
+Don't rely on the API too much tho, because it will change. Some of this documentation is also outdated.
 
 ## Tragedy's Data Model
 
@@ -61,8 +61,6 @@ Come hang out on #cassandra on irc.freenode.net. Email: enki@bbq.io. Twitter: [@
 
 ## Example (full twitter-demo)
 
-    import tragedy
-    client = tragedy.connect(['localhost:9160'])
     from tragedy import *
     
     dev_cluster  = Cluster('Dev Cluster')
@@ -73,82 +71,60 @@ Come hang out on #cassandra on irc.freenode.net. Email: enki@bbq.io. Twitter: [@
     class User(Model):
         """A Model is stored and retrieved by its RowKey.
            Every Model has exactly one RowKey and one or more other Fields"""
-        username  = RowKey()
-        firstname = StringField(mandatory=False)
-        lastname  = StringField(mandatory=False) # normally fields are mandatory
-        password  = StringField()
+        userid    = RowKey(autogenerate=True)
+        username  = AsciiField()
+        firstname = UnicodeField(mandatory=False)
+        lastname  = UnicodeField(mandatory=False) # normally fields are mandatory
+        password  = UnicodeField()
+    
+        allusers = AllIndex()
+        by_lastname = SecondaryIndex(lastname)
+        by_firstname = SecondaryIndex(firstname)
+    
+        following = ObjectIndex(target_model='User')
+        followed_by = ObjectIndex(target_model='User')
+        
+        tweets_sent = ObjectIndex(target_model='Tweet')
+        tweets_received = ObjectIndex(target_model='Tweet')
     
         def follow(self, *one_or_more):
-            fol = Following(username=self)
+            fol = self.following()
             for other in one_or_more:
                 fol.append(other)
-                FollowedBy(username=other).append(self).save()
+                other.followed_by().append(self).save()
             fol.save()
+            # print "FOLLOW", fol, self.followed_by(user=other).load()
     
         def tweet(self, message):
             new_tweet = Tweet(author=self, message=message[:140]).save()
-            TweetsSent(by_username=self).append(new_tweet).save()
-            
-            tr = TweetsReceived(by_username=ALLTWEETS_KEY)
-            tr.append(new_tweet).save()
-            
-            for follower in self.get_followed_by():
+            # print 'wtf', new_tweet
+            a = self.tweets_sent()
+            # print 'TWOP', a, a._row_key_name
+            a.append( new_tweet ).save()
+            # print 'FROB', a
+    
+            for follower in self.followed_by().load():
+                # print 'FOLLOWER', follower
                 follower.receive(new_tweet)            
     
         def receive(self, tweet):
-            TweetsReceived(by_username=self).append(tweet).save()
-    
-        def get_followed_by(self, *args, **kwargs):
-            return FollowedBy(username=self).load(*args, **kwargs)
-    
-        def get_following(self, *args, **kwargs):
-            return Following(username=self).load(*args, **kwargs)
-    
-        def get_tweets_sent(self, *args, **kwargs):
-            return TweetsSent(by_username=self).load(*args, **kwargs).resolve()
-    
-        def get_tweets_received(self, *args, **kwargs):
-            return TweetsSent(by_username=self).load(*args, **kwargs).resolve()
+            # print self, 'RECEIVING', tweet
+            self.tweets_received().append(tweet).save()
     
     class Tweet(Model):
         uuid    = RowKey(autogenerate=True) # generate a UUID for us.
-        message = StringField()    
+        message = UnicodeField()    
         author  = ForeignKey(foreign_class=User, mandatory=True)
-    
-        @staticmethod
-        def get_recent_tweets(*args, **kwargs):
-            tr = TweetsReceived(by_username=ALLTWEETS_KEY)
-            return tr.load(*args, **kwargs).loadIterValues()
-    
-        # def __repr__(self):
-        #     return '<%s> %s' % (self['author']['username'], self['message'])
-    
-    class TweetsSent(Index):
-        """An index is an ordered mapping from a RowKey to
-           instances of a specific Model."""
-        by_username = RowKey()
-        targetmodel = ForeignKey(foreign_class=Tweet, compare_with='TimeUUIDType')
-    
-    class TweetsReceived(Index):
-        by_username = RowKey()
-        targetmodel = ForeignKey(foreign_class=Tweet, compare_with='TimeUUIDType')
-    
-    class Following(Index):
-        username = RowKey()
-        targetmodel = ForeignKey(foreign_class=User, compare_with='TimeUUIDType', 
-                                 unique=True)    
-    
-    class FollowedBy(Index):
-        username = RowKey()
-        targetmodel = ForeignKey(foreign_class=User, compare_with='TimeUUIDType',
-                                 unique=True)
-    
-    # We're done with defining the Data Model. Let's verify that Cassandra agrees on the model!
-    twitty_keyspace.verify_datamodel()
-    # Ok, all set. Let's go!
+        
+        alltweets = AllIndex()
+        
+    twitty_keyspace.connect(servers=['localhost:9160'], auto_create_models=True, auto_drop_keyspace=True)
     
     dave = User(username='dave', firstname='dave', password='test').save()
-    merlin = User(username='merlin', firstname='merlin', password='sunshine').save()
+    
+    bood = User(username='dave', firstname='dave', lastname='Bood', password='super').save()
+    
+    merlin = User(username='merlin', firstname='merlin', lastname='Bood', password='sunshine').save()
     peter = User(username='peter', firstname='Peter', password='secret').save()
     
     dave.follow(merlin, peter)
@@ -159,9 +135,14 @@ Come hang out on #cassandra on irc.freenode.net. Email: enki@bbq.io. Twitter: [@
     dave.tweet('making breakfast')
     peter.tweet('sitting at home being bored')
     
-    for dude in (dave,peter,merlin):
-        name = dude['username']
-        print '%s has these followers:' % (name,), dude.get_followed_by().values()
-        print '%s follows' % (name,), dude.get_following().values()
-        print '%s sent' % (name,), [x for x in dude.get_tweets_sent(count=3)]
-        print '%s received' % (name,), [x for x in dude.get_tweets_received(count=3)]
+    print 'A', User.allusers(), list(User.allusers().load().resolve())
+    print 'B', User.by_lastname('Bood'), list(User.by_lastname('Bood').load().resolve())
+    print 'C', dave.tweets_received(), list(dave.tweets_received().load().resolve())
+    
+    # 
+    # for dude in (dave,peter,merlin):
+    #     name = dude['username']
+    #     print '%s has these followers:' % (name,), dude.get_followed_by().values()
+    #     print '%s follows' % (name,), dude.get_following().values()
+    #     print '%s sent' % (name,), [x for x in dude.get_tweets_sent(count=3)]
+    #     print '%s received' % (name,), [x for x in dude.get_tweets_received(count=3)]
