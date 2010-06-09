@@ -127,8 +127,9 @@ class SingleConnection(object):
         self._keyspace_set = None
 
     def set_keyspace(self, keyspace):
-        # self.__getattr__('set_keyspace')(keyspace)
         self._keyspace_set = keyspace
+        if self._client and not self._client.__dict__.get('keyspace_already_set'):
+            self.__getattr__('set_keyspace')(keyspace)
 
     def __getattr__(self, attr):
         def client_call(*args, **kwargs):
@@ -162,8 +163,9 @@ class SingleConnection(object):
         for server in self._servers:
             try:
                 self._client, self._transport = create_client_transport(server, self._framed_transport, self._timeout)
-                assert self._keyspace_set, 'No keyspace set before connect!'
-                self.__getattr__('set_keyspace')(self._keyspace_set)
+                if self._keyspace_set:
+                    self.__getattr__('set_keyspace')(self._keyspace_set)
+                    self._client.__dict__['keyspace_already_set'] = True
                 return
             except (Thrift.TException, socket.timeout, socket.error), exc:
                 unhandled_exception_handler()
@@ -182,6 +184,11 @@ class ThreadLocalConnection(object):
         self._framed_transport = framed_transport
         self._timeout = timeout
         self._keyspace_set = None
+
+    def set_keyspace(self, keyspace):
+        self._keyspace_set = keyspace
+        if self._local_client and not self._local_client.__dict__.get('keyspace_already_set'):
+            self.__getattr__('set_keyspace')(keyspace)
 
     def __getattr__(self, attr):
         def client_call(*args, **kwargs):
@@ -224,8 +231,9 @@ class ThreadLocalConnection(object):
         for server in servers:
             try:
                 self._local.client, self._local.transport = create_client_transport(server, self._framed_transport, self._timeout)
-                assert self._keyspace_set, 'No keyspace set before connect!'
-                self._local_client.__getattr__('set_keyspace')(self._keyspace_set)
+                if self._keyspace_set:
+                    self._local_client.__getattr__('set_keyspace')(self._keyspace_set)
+                    self._local_client.__dict__['keyspace_already_set'] = True
                 return
             except (Thrift.TException, socket.timeout, socket.error), exc:
                 continue
