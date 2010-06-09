@@ -1,7 +1,7 @@
 import functools
 import itertools
 import uuid
-from cassandra.ttypes import (Column, ColumnOrSuperColumn, ColumnParent,
+from cassandra.ttypes import (Column, Clock, ColumnOrSuperColumn, ColumnParent,
     ColumnPath, ConsistencyLevel, NotFoundException, SlicePredicate,
     SliceRange, SuperColumn, CfDef, Mutation)
 
@@ -194,7 +194,7 @@ class BasicRow(RowDefaults):
         
         for column_key, spec in self.column_spec.items():
             value = self.column_values.get(column_key)
-            if spec.mandatory and not self.column_values.get(column_key):
+            if spec.mandatory and (self.column_values.get(column_key) is None):
                 if spec.default:
                     default = spec.get_default()
                     self.set_value_for_columnkey(column_key, default)
@@ -229,7 +229,7 @@ class BasicRow(RowDefaults):
             if for_saving:
                 value = spec.value_for_saving(value)
             
-            if value:
+            if not (value is None):
                 column_key, value = getattr(spec, access_mode)(column_key, value)
             else:
                 column_key = getattr(spec, 'key_' + access_mode)(column_key)
@@ -409,7 +409,7 @@ class BasicRow(RowDefaults):
             newtimestamp = self._timestamp_func()
             import time
             print 'STORING WITH NEWTIMESTAMP', self.__class__, column_key, newtimestamp #time.ctime( int(newtimestamp) ) 
-            column = Column(name=column_key, value=value, timestamp=newtimestamp)
+            column = Column(name=column_key, value=value, clock=Clock(timestamp=newtimestamp))
             save_columns.append( ColumnOrSuperColumn(column=column) )
         
         save_mutations = [Mutation(column_or_supercolumn=sc) for sc in save_columns]
@@ -451,6 +451,7 @@ class DictRow(BasicRow):
     
     def __getitem__(self, column_key):
         value = self.get(column_key)
+        print 'FUCK', self.column_values
         if value is None:
             raise KeyError('No Value set for %s (%s)' % (column_key, self._column_family))
         return value
@@ -463,7 +464,7 @@ class DictRow(BasicRow):
         
         spec = self.get_spec_for_columnkey(column_key)
         value = self.get_value_for_columnkey(column_key)
-        if value:
+        if not (value is None):
             value = getattr(spec, 'value_' + access_mode)(value)
         else:
             value = default

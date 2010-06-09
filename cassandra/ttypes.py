@@ -24,22 +24,23 @@ class ConsistencyLevel(object):
   allowing availability in the face of node failures up to half of <ReplicationFactor>. Of course if latency is more
   important than consistency then you can use lower values for either or both.
   
-  Write:
-       ZERO    Ensure nothing. A write happens asynchronously in background
-       ANY     Ensure that the write has been written once somewhere, including possibly being hinted in a non-target node.
-       ONE     Ensure that the write has been written to at least 1 node's commit log and memory table before responding to the client.
-       QUORUM  Ensure that the write has been written to <ReplicationFactor> / 2 + 1 nodes before responding to the client.
-       ALL     Ensure that the write is written to <code>&lt;ReplicationFactor&gt;</code> nodes before responding to the client.
+  Write consistency levels make the following guarantees before reporting success to the client:
+    ZERO         Ensure nothing. A write happens asynchronously in background
+    ANY          Ensure that the write has been written once somewhere, including possibly being hinted in a non-target node.
+    ONE          Ensure that the write has been written to at least 1 node's commit log and memory table
+    QUORUM       Ensure that the write has been written to <ReplicationFactor> / 2 + 1 nodes
+    DCQUORUM     Ensure that the write has been written to <ReplicationFactor> / 2 + 1 nodes, within the local datacenter (requires DatacenterShardStrategy)
+    DCQUORUMSYNC Ensure that the write has been written to <ReplicationFactor> / 2 + 1 nodes in each datacenter (requires DatacenterShardStrategy)
+    ALL          Ensure that the write is written to <code>&lt;ReplicationFactor&gt;</code> nodes before responding to the client.
   
   Read:
-       ZERO    Not supported, because it doesn't make sense.
-       ANY     Not supported. You probably want ONE instead.
-       ONE     Will return the record returned by the first node to respond. A consistency check is always done in a
-               background thread to fix any consistency issues when ConsistencyLevel.ONE is used. This means subsequent
-               calls will have correct data even if the initial read gets an older value. (This is called 'read repair'.)
-       QUORUM  Will query all storage nodes and return the record with the most recent timestamp once it has at least a
-               majority of replicas reported. Again, the remaining replicas will be checked in the background.
-       ALL     Not yet supported, but we plan to eventually.
+    ZERO         Not supported, because it doesn't make sense.
+    ANY          Not supported. You probably want ONE instead.
+    ONE          Will return the record returned by the first node to respond. A consistency check is always done in a background thread to fix any consistency issues when ConsistencyLevel.ONE is used. This means subsequent calls will have correct data even if the initial read gets an older value. (This is called 'read repair'.)
+    QUORUM       Will query all storage nodes and return the record with the most recent timestamp once it has at least a majority of replicas reported. Again, the remaining replicas will be checked in the background.
+    DCQUORUM     Returns the record with the most recent timestamp once a majority of replicas within the local datacenter have replied.
+    DCQUORUMSYNC Returns the record with the most recent timestamp once a majority of replicas within each datacenter have replied.
+    ALL          Queries all storage nodes and returns the record with the most recent timestamp.
   """
   ZERO = 0
   ONE = 1
@@ -97,18 +98,80 @@ class AccessLevel(object):
     "FULL": 64,
   }
 
+class Clock(object):
+  """
+  Encapsulate types of conflict resolution.
+  
+  @param timestamp. User-supplied timestamp. When two columns with this type of clock conflict, the one with the
+                    highest timestamp is the one whose value the system will converge to. No other assumptions
+                    are made about what the timestamp represents, but using microseconds-since-epoch is customary.
+  
+  Attributes:
+   - timestamp
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.I64, 'timestamp', None, None, ), # 1
+  )
+
+  def __init__(self, timestamp=None,):
+    self.timestamp = timestamp
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.I64:
+          self.timestamp = iprot.readI64();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('Clock')
+    if self.timestamp != None:
+      oprot.writeFieldBegin('timestamp', TType.I64, 1)
+      oprot.writeI64(self.timestamp)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
 class Column(object):
   """
   Basic unit of data within a ColumnFamily.
   @param name, the name by which this column is set and retrieved.  Maximum 64KB long.
   @param value. The data associated with the name.  Maximum 2GB long, but in practice you should limit it to small numbers of MB (since Thrift must read the full value into memory to operate on it).
-  @param timestamp. The highest timestamp associated with the given column name is the one whose value the system will converge to.  No other assumptions are made about what the timestamp represents, but using microseconds-since-epoch is customary.
+  @param clock. The clock is used for conflict detection/resolution when two columns with same name need to be compared.
   @param ttl. An optional, positive delay (in seconds) after which the column will be automatically deleted.
   
   Attributes:
    - name
    - value
-   - timestamp
+   - clock
    - ttl
   """
 
@@ -116,14 +179,14 @@ class Column(object):
     None, # 0
     (1, TType.STRING, 'name', None, None, ), # 1
     (2, TType.STRING, 'value', None, None, ), # 2
-    (3, TType.I64, 'timestamp', None, None, ), # 3
+    (3, TType.STRUCT, 'clock', (Clock, Clock.thrift_spec), None, ), # 3
     (4, TType.I32, 'ttl', None, None, ), # 4
   )
 
-  def __init__(self, name=None, value=None, timestamp=None, ttl=None,):
+  def __init__(self, name=None, value=None, clock=None, ttl=None,):
     self.name = name
     self.value = value
-    self.timestamp = timestamp
+    self.clock = clock
     self.ttl = ttl
 
   def read(self, iprot):
@@ -146,8 +209,9 @@ class Column(object):
         else:
           iprot.skip(ftype)
       elif fid == 3:
-        if ftype == TType.I64:
-          self.timestamp = iprot.readI64();
+        if ftype == TType.STRUCT:
+          self.clock = Clock()
+          self.clock.read(iprot)
         else:
           iprot.skip(ftype)
       elif fid == 4:
@@ -173,9 +237,9 @@ class Column(object):
       oprot.writeFieldBegin('value', TType.STRING, 2)
       oprot.writeString(self.value)
       oprot.writeFieldEnd()
-    if self.timestamp != None:
-      oprot.writeFieldBegin('timestamp', TType.I64, 3)
-      oprot.writeI64(self.timestamp)
+    if self.clock != None:
+      oprot.writeFieldBegin('clock', TType.STRUCT, 3)
+      self.clock.write(oprot)
       oprot.writeFieldEnd()
     if self.ttl != None:
       oprot.writeFieldBegin('ttl', TType.I32, 4)
@@ -848,7 +912,7 @@ class SliceRange(object):
                 must a valid value under the rules of the Comparator defined for the given ColumnFamily.
   @param finish. The column name to stop the slice at. This attribute is not required, though there is no default value,
                  and can be safely set to an empty byte array to not stop until 'count' results are seen. Otherwise, it
-                 must also be a value value to the ColumnFamily Comparator.
+                 must also be a valid value to the ColumnFamily Comparator.
   @param reversed. Whether the results should be ordered in reversed order. Similar to ORDER BY blah DESC in SQL.
   @param count. How many keys to return. Similar to LIMIT 100 in SQL. May be arbitrarily large, but Thrift will
                 materialize the whole result into memory before returning it to the client, so be aware that you may
@@ -1251,20 +1315,20 @@ class KeySlice(object):
 class Deletion(object):
   """
   Attributes:
-   - timestamp
+   - clock
    - super_column
    - predicate
   """
 
   thrift_spec = (
     None, # 0
-    (1, TType.I64, 'timestamp', None, None, ), # 1
+    (1, TType.STRUCT, 'clock', (Clock, Clock.thrift_spec), None, ), # 1
     (2, TType.STRING, 'super_column', None, None, ), # 2
     (3, TType.STRUCT, 'predicate', (SlicePredicate, SlicePredicate.thrift_spec), None, ), # 3
   )
 
-  def __init__(self, timestamp=None, super_column=None, predicate=None,):
-    self.timestamp = timestamp
+  def __init__(self, clock=None, super_column=None, predicate=None,):
+    self.clock = clock
     self.super_column = super_column
     self.predicate = predicate
 
@@ -1278,8 +1342,9 @@ class Deletion(object):
       if ftype == TType.STOP:
         break
       if fid == 1:
-        if ftype == TType.I64:
-          self.timestamp = iprot.readI64();
+        if ftype == TType.STRUCT:
+          self.clock = Clock()
+          self.clock.read(iprot)
         else:
           iprot.skip(ftype)
       elif fid == 2:
@@ -1303,9 +1368,9 @@ class Deletion(object):
       oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
       return
     oprot.writeStructBegin('Deletion')
-    if self.timestamp != None:
-      oprot.writeFieldBegin('timestamp', TType.I64, 1)
-      oprot.writeI64(self.timestamp)
+    if self.clock != None:
+      oprot.writeFieldBegin('clock', TType.STRUCT, 1)
+      self.clock.write(oprot)
       oprot.writeFieldEnd()
     if self.super_column != None:
       oprot.writeFieldBegin('super_column', TType.STRING, 2)
@@ -1565,8 +1630,10 @@ class CfDef(object):
    - table
    - name
    - column_type
+   - clock_type
    - comparator_type
    - subcomparator_type
+   - reconciler
    - comment
    - row_cache_size
    - preload_row_cache
@@ -1578,20 +1645,24 @@ class CfDef(object):
     (1, TType.STRING, 'table', None, None, ), # 1
     (2, TType.STRING, 'name', None, None, ), # 2
     (3, TType.STRING, 'column_type', None, "Standard", ), # 3
-    (4, TType.STRING, 'comparator_type', None, "BytesType", ), # 4
-    (5, TType.STRING, 'subcomparator_type', None, "", ), # 5
-    (6, TType.STRING, 'comment', None, "", ), # 6
-    (7, TType.DOUBLE, 'row_cache_size', None, 0, ), # 7
-    (8, TType.BOOL, 'preload_row_cache', None, False, ), # 8
-    (9, TType.DOUBLE, 'key_cache_size', None, 200000, ), # 9
+    (4, TType.STRING, 'clock_type', None, "Timestamp", ), # 4
+    (5, TType.STRING, 'comparator_type', None, "BytesType", ), # 5
+    (6, TType.STRING, 'subcomparator_type', None, "", ), # 6
+    (7, TType.STRING, 'reconciler', None, "", ), # 7
+    (8, TType.STRING, 'comment', None, "", ), # 8
+    (9, TType.DOUBLE, 'row_cache_size', None, 0, ), # 9
+    (10, TType.BOOL, 'preload_row_cache', None, False, ), # 10
+    (11, TType.DOUBLE, 'key_cache_size', None, 200000, ), # 11
   )
 
-  def __init__(self, table=None, name=None, column_type=thrift_spec[3][4], comparator_type=thrift_spec[4][4], subcomparator_type=thrift_spec[5][4], comment=thrift_spec[6][4], row_cache_size=thrift_spec[7][4], preload_row_cache=thrift_spec[8][4], key_cache_size=thrift_spec[9][4],):
+  def __init__(self, table=None, name=None, column_type=thrift_spec[3][4], clock_type=thrift_spec[4][4], comparator_type=thrift_spec[5][4], subcomparator_type=thrift_spec[6][4], reconciler=thrift_spec[7][4], comment=thrift_spec[8][4], row_cache_size=thrift_spec[9][4], preload_row_cache=thrift_spec[10][4], key_cache_size=thrift_spec[11][4],):
     self.table = table
     self.name = name
     self.column_type = column_type
+    self.clock_type = clock_type
     self.comparator_type = comparator_type
     self.subcomparator_type = subcomparator_type
+    self.reconciler = reconciler
     self.comment = comment
     self.row_cache_size = row_cache_size
     self.preload_row_cache = preload_row_cache
@@ -1623,30 +1694,40 @@ class CfDef(object):
           iprot.skip(ftype)
       elif fid == 4:
         if ftype == TType.STRING:
-          self.comparator_type = iprot.readString();
+          self.clock_type = iprot.readString();
         else:
           iprot.skip(ftype)
       elif fid == 5:
         if ftype == TType.STRING:
-          self.subcomparator_type = iprot.readString();
+          self.comparator_type = iprot.readString();
         else:
           iprot.skip(ftype)
       elif fid == 6:
         if ftype == TType.STRING:
-          self.comment = iprot.readString();
+          self.subcomparator_type = iprot.readString();
         else:
           iprot.skip(ftype)
       elif fid == 7:
+        if ftype == TType.STRING:
+          self.reconciler = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 8:
+        if ftype == TType.STRING:
+          self.comment = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 9:
         if ftype == TType.DOUBLE:
           self.row_cache_size = iprot.readDouble();
         else:
           iprot.skip(ftype)
-      elif fid == 8:
+      elif fid == 10:
         if ftype == TType.BOOL:
           self.preload_row_cache = iprot.readBool();
         else:
           iprot.skip(ftype)
-      elif fid == 9:
+      elif fid == 11:
         if ftype == TType.DOUBLE:
           self.key_cache_size = iprot.readDouble();
         else:
@@ -1673,28 +1754,36 @@ class CfDef(object):
       oprot.writeFieldBegin('column_type', TType.STRING, 3)
       oprot.writeString(self.column_type)
       oprot.writeFieldEnd()
+    if self.clock_type != None:
+      oprot.writeFieldBegin('clock_type', TType.STRING, 4)
+      oprot.writeString(self.clock_type)
+      oprot.writeFieldEnd()
     if self.comparator_type != None:
-      oprot.writeFieldBegin('comparator_type', TType.STRING, 4)
+      oprot.writeFieldBegin('comparator_type', TType.STRING, 5)
       oprot.writeString(self.comparator_type)
       oprot.writeFieldEnd()
     if self.subcomparator_type != None:
-      oprot.writeFieldBegin('subcomparator_type', TType.STRING, 5)
+      oprot.writeFieldBegin('subcomparator_type', TType.STRING, 6)
       oprot.writeString(self.subcomparator_type)
       oprot.writeFieldEnd()
+    if self.reconciler != None:
+      oprot.writeFieldBegin('reconciler', TType.STRING, 7)
+      oprot.writeString(self.reconciler)
+      oprot.writeFieldEnd()
     if self.comment != None:
-      oprot.writeFieldBegin('comment', TType.STRING, 6)
+      oprot.writeFieldBegin('comment', TType.STRING, 8)
       oprot.writeString(self.comment)
       oprot.writeFieldEnd()
     if self.row_cache_size != None:
-      oprot.writeFieldBegin('row_cache_size', TType.DOUBLE, 7)
+      oprot.writeFieldBegin('row_cache_size', TType.DOUBLE, 9)
       oprot.writeDouble(self.row_cache_size)
       oprot.writeFieldEnd()
     if self.preload_row_cache != None:
-      oprot.writeFieldBegin('preload_row_cache', TType.BOOL, 8)
+      oprot.writeFieldBegin('preload_row_cache', TType.BOOL, 10)
       oprot.writeBool(self.preload_row_cache)
       oprot.writeFieldEnd()
     if self.key_cache_size != None:
-      oprot.writeFieldBegin('key_cache_size', TType.DOUBLE, 9)
+      oprot.writeFieldBegin('key_cache_size', TType.DOUBLE, 11)
       oprot.writeDouble(self.key_cache_size)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()

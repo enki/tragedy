@@ -30,21 +30,22 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '   multiget_count(string keyspace,  keys, ColumnParent column_parent, SlicePredicate predicate, ConsistencyLevel consistency_level)'
   print '   get_range_slices(ColumnParent column_parent, SlicePredicate predicate, KeyRange range, ConsistencyLevel consistency_level)'
   print '  void insert(string key, ColumnParent column_parent, Column column, ConsistencyLevel consistency_level)'
-  print '  void remove(string key, ColumnPath column_path, i64 timestamp, ConsistencyLevel consistency_level)'
+  print '  void remove(string key, ColumnPath column_path, Clock clock, ConsistencyLevel consistency_level)'
   print '  void batch_mutate( mutation_map, ConsistencyLevel consistency_level)'
-  print '  void truncate(string keyspace, string cfname)'
+  print '  void truncate(string cfname)'
+  print '   check_schema_agreement()'
   print '   describe_keyspaces()'
   print '  string describe_cluster_name()'
   print '  string describe_version()'
   print '   describe_ring(string keyspace)'
   print '   describe_keyspace(string keyspace)'
-  print '   describe_splits(string start_token, string end_token, i32 keys_per_split)'
-  print '  void system_add_column_family(CfDef cf_def)'
-  print '  void system_drop_column_family(string keyspace, string column_family)'
-  print '  void system_rename_column_family(string keyspace, string old_name, string new_name)'
-  print '  void system_add_keyspace(KsDef ks_def)'
-  print '  void system_drop_keyspace(string keyspace)'
-  print '  void system_rename_keyspace(string old_name, string new_name)'
+  print '   describe_splits(string keyspace, string cfName, string start_token, string end_token, i32 keys_per_split)'
+  print '  string system_add_column_family(CfDef cf_def)'
+  print '  string system_drop_column_family(string column_family)'
+  print '  string system_rename_column_family(string old_name, string new_name)'
+  print '  string system_add_keyspace(KsDef ks_def)'
+  print '  string system_drop_keyspace(string keyspace)'
+  print '  string system_rename_keyspace(string old_name, string new_name)'
   print ''
   sys.exit(0)
 
@@ -160,10 +161,16 @@ elif cmd == 'batch_mutate':
   pp.pprint(client.batch_mutate(eval(args[0]),eval(args[1]),))
 
 elif cmd == 'truncate':
-  if len(args) != 2:
-    print 'truncate requires 2 args'
+  if len(args) != 1:
+    print 'truncate requires 1 args'
     sys.exit(1)
-  pp.pprint(client.truncate(args[0],args[1],))
+  pp.pprint(client.truncate(args[0],))
+
+elif cmd == 'check_schema_agreement':
+  if len(args) != 0:
+    print 'check_schema_agreement requires 0 args'
+    sys.exit(1)
+  pp.pprint(client.check_schema_agreement())
 
 elif cmd == 'describe_keyspaces':
   if len(args) != 0:
@@ -196,10 +203,10 @@ elif cmd == 'describe_keyspace':
   pp.pprint(client.describe_keyspace(args[0],))
 
 elif cmd == 'describe_splits':
-  if len(args) != 3:
-    print 'describe_splits requires 3 args'
+  if len(args) != 5:
+    print 'describe_splits requires 5 args'
     sys.exit(1)
-  pp.pprint(client.describe_splits(args[0],args[1],eval(args[2]),))
+  pp.pprint(client.describe_splits(args[0],args[1],args[2],args[3],eval(args[4]),))
 
 elif cmd == 'system_add_column_family':
   if len(args) != 1:
@@ -208,16 +215,16 @@ elif cmd == 'system_add_column_family':
   pp.pprint(client.system_add_column_family(eval(args[0]),))
 
 elif cmd == 'system_drop_column_family':
-  if len(args) != 2:
-    print 'system_drop_column_family requires 2 args'
+  if len(args) != 1:
+    print 'system_drop_column_family requires 1 args'
     sys.exit(1)
-  pp.pprint(client.system_drop_column_family(args[0],args[1],))
+  pp.pprint(client.system_drop_column_family(args[0],))
 
 elif cmd == 'system_rename_column_family':
-  if len(args) != 3:
-    print 'system_rename_column_family requires 3 args'
+  if len(args) != 2:
+    print 'system_rename_column_family requires 2 args'
     sys.exit(1)
-  pp.pprint(client.system_rename_column_family(args[0],args[1],args[2],))
+  pp.pprint(client.system_rename_column_family(args[0],args[1],))
 
 elif cmd == 'system_add_keyspace':
   if len(args) != 1:
