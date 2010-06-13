@@ -451,7 +451,7 @@ class DictRow(BasicRow):
     
     def __getitem__(self, column_key):
         value = self.get(column_key)
-        print 'FUCK', self.column_values
+        # print 'FUCK', self.column_values
         if value is None:
             raise KeyError('No Value set for %s (%s)' % (column_key, self._column_family))
         return value
