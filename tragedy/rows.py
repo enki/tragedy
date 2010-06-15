@@ -136,11 +136,9 @@ class BasicRow(RowDefaults):
         
         # Extract the Columnspecs
         self.extract_specs_from_class()
-        
-        raw_datastore_data = kwargs.pop('_raw_datastore_data', False)
-        
-        if raw_datastore_data:
-            self._update(*args, **kwargs, for_loading=True)
+                
+        if kwargs.get('_for_loading'):
+            self._update(*args, **kwargs)
         else:
             self.update(*args, **kwargs)
             
@@ -270,7 +268,7 @@ class BasicRow(RowDefaults):
 
     def _update(self, *args, **kwargs):        
         access_mode = kwargs.pop('access_mode', 'to_identity')
-        for_loading = kwargs.pop('for_loading', False)
+        _for_loading = kwargs.pop('_for_loading', False)
         
         tmp = OrderedDict()
         tmp.update(*args, **kwargs)
@@ -281,7 +279,7 @@ class BasicRow(RowDefaults):
                 continue
             spec = self.column_spec.get(column_key, self._default_field)
             column_key, value = getattr(spec, access_mode)(column_key, value)
-            self.set_value_for_columnkey(column_key, value, dont_mark=for_loading)
+            self.set_value_for_columnkey(column_key, value, dont_mark=_for_loading)
 
     def markChanged(self, column_key):
         self.column_changed[column_key] = True
@@ -356,7 +354,7 @@ class BasicRow(RowDefaults):
         assert self.row_key, 'No row_key and no non-null non-empty keys argument. Did you use the right row_key_name?'
         tkeys = [self.row_key]
         result = list(self.load_multi(keys=tkeys))
-        self._update(result[0].column_values, for_loading=True)
+        self._update(result[0].column_values, _for_loading=True)
         return self
         # # print self, dir(self), self._row_key_name
         # assert self.row_key, 'No row_key and no non-null non-empty keys argument. Did you use the right row_key_name?'
@@ -366,7 +364,7 @@ class BasicRow(RowDefaults):
         # 
         # data = list(self.multiget_slice(keys=tkeys, *args, **kwargs))
         # assert len(data) == 1
-        # self._update(data[0][1], for_loading=True)
+        # self._update(data[0][1], _for_loading=True)
         # # return data[0][1]
         # 
         # # if load_subkeys:
