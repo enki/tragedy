@@ -136,8 +136,14 @@ class BasicRow(RowDefaults):
         
         # Extract the Columnspecs
         self.extract_specs_from_class()
-                
-        self.update(*args, **kwargs)
+        
+        raw_datastore_data = kwargs.pop('_raw_datastore_data', False)
+        
+        if raw_datastore_data:
+            self._update(*args, **kwargs, for_loading=True)
+        else:
+            self.update(*args, **kwargs)
+            
         self.init(*args, **kwargs)
     
     def init(self, *args, **kwargs):
@@ -331,6 +337,7 @@ class BasicRow(RowDefaults):
             columns = OrderedDict(columns)
             columns['row_key'] = row_key
             columns['access_mode'] = 'to_identity'
+            columns['_raw_datastore_data'] = True
             if not ordered:
                 yield cls( **columns )
             else:
