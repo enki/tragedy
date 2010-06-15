@@ -63,6 +63,7 @@ class RowDefaults(object):
     _row_cache_size = 0
     _preload_row_cache = False
     _key_cache_size = 200000
+    _dont_hash_row_key = False # not in use right now, but we seem to have encoding issues.
 
     @classmethod
     def _init_class(cls, name=None):
@@ -321,6 +322,11 @@ class BasicRow(RowDefaults):
         unordered = {}
         if not kwargs['keys']:
             raise StopIteration
+
+        for row_key in kwargs['keys']:
+            assert row_key, 'Empty row_key %s' % (row_key,)
+            assert isinstance(row_key, basestring), 'Row Key %s is of type %s should be basestring.' % (row_key, type(row_key,))
+        
         for row_key, columns in cls.multiget_slice(*args, **kwargs):
             columns = OrderedDict(columns)
             columns['row_key'] = row_key
@@ -340,20 +346,25 @@ class BasicRow(RowDefaults):
     def load(self, *args, **kwargs):
         if not self.row_key and self._row_key_spec.default:
                 self.row_key = self._row_key_spec.get_default()
-        # print self, dir(self), self._row_key_name
         assert self.row_key, 'No row_key and no non-null non-empty keys argument. Did you use the right row_key_name?'
-        assert isinstance(self.row_key, basestring), 'Row Key is of type %s should be basestring.' % (type(self.row_key,))
-        # load_subkeys = kwargs.pop('load_subkeys', False)
         tkeys = [self.row_key]
-        
-        data = list(self.multiget_slice(keys=tkeys, *args, **kwargs))
-        assert len(data) == 1
-        self._update(data[0][1], for_loading=True)
-        # return data[0][1]
-        
-        # if load_subkeys:
-        #     return self.loadIterValues()
+        result = list(self.load_multi(keys=tkeys))
+        self._update(result[0].column_values, for_loading=True)
         return self
+        # # print self, dir(self), self._row_key_name
+        # assert self.row_key, 'No row_key and no non-null non-empty keys argument. Did you use the right row_key_name?'
+        # assert isinstance(self.row_key, basestring), 'Row Key is of type %s should be basestring.' % (type(self.row_key,))
+        # # load_subkeys = kwargs.pop('load_subkeys', False)
+        # tkeys = [self.row_key]
+        # 
+        # data = list(self.multiget_slice(keys=tkeys, *args, **kwargs))
+        # assert len(data) == 1
+        # self._update(data[0][1], for_loading=True)
+        # # return data[0][1]
+        # 
+        # # if load_subkeys:
+        # #     return self.loadIterValues()
+        # return self
         
     @classmethod
     def multiget_slice(cls, keys=None, consistency_level=None, **kwargs):
