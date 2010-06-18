@@ -426,7 +426,7 @@ class BasicRow(RowDefaults):
             newtimestamp = self._timestamp_func()
             import time
             print 'STORING WITH NEWTIMESTAMP', self.__class__, column_key, newtimestamp #time.ctime( int(newtimestamp) ) 
-            column = Column(name=column_key, value=value, clock=Clock(timestamp=newtimestamp))
+            column = Column(name=column_key, value=value.encode('utf-8'), clock=Clock(timestamp=newtimestamp))
             save_columns.append( ColumnOrSuperColumn(column=column) )
         
         save_mutations = [Mutation(column_or_supercolumn=sc) for sc in save_columns]
