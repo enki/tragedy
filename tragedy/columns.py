@@ -84,7 +84,8 @@ class AsciiField(Field):
 class UnicodeField(Field):    
     def key_to_internal(self, column_key):
         if isinstance(column_key, unicode):
-            return column_key.encode('utf-8')
+            column_key = column_key.encode('utf-8')
+        return column_key
 
 class TimeField(Field):    
     def __init__(self, *args, **kwargs):
