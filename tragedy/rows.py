@@ -136,7 +136,7 @@ class BasicRow(RowDefaults):
         
         # Extract the Columnspecs
         self.extract_specs_from_class()
-                
+        
         if kwargs.get('_for_loading'):
             self._update(*args, **kwargs)
         else:
@@ -319,6 +319,7 @@ class BasicRow(RowDefaults):
     
     @staticmethod
     def decodeColumn(colOrSuper):
+        # print 'DECODE', colOrSuper.column.name, colOrSuper.column.clock
         return (colOrSuper.column.name, colOrSuper.column.value)
         
     @classmethod
@@ -335,9 +336,9 @@ class BasicRow(RowDefaults):
             columns = OrderedDict(columns)
             columns['row_key'] = row_key
             columns['access_mode'] = 'to_identity'
-            columns['_raw_datastore_data'] = True
+            columns['_for_loading'] = True
             if not ordered:
-                yield cls( **columns )
+                yield cls( **columns)
             else:
                 unordered[row_key] = columns
         
@@ -436,6 +437,8 @@ class BasicRow(RowDefaults):
         #                          consistency_level= self._wcl(kwargs['write_consistency_level']),
         #                         )
         mumap = {save_row_key: {self._column_family: save_mutations} }
+        print u'PREMUMAP', unicode(save_mutations).encode('ascii', 'replace')
+        print u'MUMAP', repr(mumap).encode('ascii', 'replace')
         self.getclient().batch_mutate(
                                       mutation_map=mumap,
                                       consistency_level=self._wcl(kwargs['write_consistency_level']),
