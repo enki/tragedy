@@ -30,6 +30,8 @@ class ConvertAPI(BaseField):
         return column_key
 
     def value_to_internal(self, value): # called for userinput (before adding)
+        if isinstance(value, unicode):
+            value = value.encode('utf-8')
         return value
 
     def to_display(self, column_key, value):
@@ -81,7 +83,8 @@ class AsciiField(Field):
 
 class UnicodeField(Field):    
     def key_to_internal(self, column_key):
-        return unicode(column_key)
+        if isinstance(column_key, unicode):
+            return column_key.encode('utf-8')
 
 class TimeField(Field):    
     def __init__(self, *args, **kwargs):
