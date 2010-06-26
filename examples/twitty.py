@@ -3,8 +3,6 @@ from tragedy import *
 dev_cluster  = Cluster('Dev Cluster')
 twitty_keyspace = Keyspace('Twitty', dev_cluster)
 
-ALLTWEETS_KEY = '!ALLTWEETS!' # virtual user that receives all tweets
-
 class User(Model):
     """A Model is stored and retrieved by its RowKey.
        Every Model has exactly one RowKey and one or more other Fields"""
@@ -18,8 +16,6 @@ class Tweet(Model):
     uuid    = RowKey(autogenerate=True) # generate a UUID for us.
     message = UnicodeField()    
     author  = ForeignKey(foreign_class=User, mandatory=True)
-    
-    alltweets = AllIndex()
 
 class TweetsSent(Index):
 	by_username = RowKey()
