@@ -2,6 +2,8 @@
 
 Tragedy is a high-level Cassandra Object Abstraction for Python.
 
+This branch is outdated go to http://github.com/enki/tragedy/ for a more recent version.
+
 ## Tragedy's Data Model
 
 In Tragedy you build your data model from Models and Indexes. An abstract *Model* specifies the kind data that can be stored in a Model-Instance. We also call a Model-Instance a Row, since specific Model-Instances are uniquely identified by their unique RowKey. Knowing the Model and RowKey is all you need to store and retrieve data from Cassandra. The attributes of the Model correspond to the Columns of a Row. Each Column has a Field-Type like StringField or IntegerField. The RowKey decides which specific Row/Model-Instance the user is referring to and on which physical machine the data is stored. If you lose a RowKey, you can never store or retrieve that data again. Any Unicode string can be used as RowKey as long as it is unique among all Rows of a Model. If there's no naturally unique identifier for the data in a Row, you can ask Tragedy to generate a UUID-RowKey for you.
