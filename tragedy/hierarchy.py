@@ -79,7 +79,7 @@ class Keyspace(object):
         return u'%s%s%s' % (self.cluster.name, CASPATHSEP, self.name)
 
     def register_model(self, name, model):
-        print 'REGISTER MODEL', name
+        # print 'REGISTER MODEL', name
         self.models[name] = model
 
     def __str__(self):
@@ -94,7 +94,7 @@ class Keyspace(object):
 
     def verify_datamodel(self, **kwargs):
         self._first_iteration_in_this_cycle = True
-        print 'VERIFY', kwargs
+        # print 'VERIFY', kwargs
         for model in self.models.values():
             self.verify_datamodel_for_model(model=model, **kwargs)
     
@@ -111,15 +111,15 @@ class Keyspace(object):
         client = model.getclient()
         allkeyspaces = client.describe_keyspaces()
         if first_iteration and model._keyspace.name in allkeyspaces and kwargs['auto_drop_keyspace']:
-            print 'Autodropping keyspace %s' % (model._keyspace,)
+            print 'Autodropping keyspace %s...' % (model._keyspace,)
             client.set_keyspace(model._keyspace.name) # this op requires auth
             client.system_drop_keyspace(model._keyspace.name)            
             allkeyspaces = client.describe_keyspaces()
             
         if not model._keyspace.name in allkeyspaces:
-            print "Cassandra doesn't know about keyspace %s (only %s)" % (model._keyspace, allkeyspaces)
+            print "Cassandra doesn't know about keyspace %s (only %s)" % (model._keyspace, repr(tuple(allkeyspaces))[1:-1])
             if kwargs['auto_create_models']:
-                print 'Creating...', kwargs['auto_create_models']
+                print 'Creating keyspace %s...' % (model._keyspace,)
                 model._keyspace.register_keyspace_with_cassandra()
     
     @classmethod
@@ -139,7 +139,7 @@ class Keyspace(object):
         if not model._column_family in mykeyspace.keys():
             print "Cassandra doesn't know about ColumnFamily '%s'." % (model._column_family,)
             if kwargs['auto_create_models']:
-                print 'Creating...'
+                print 'Creating ColumnFamily %s...' % (model._column_family,)
                 model.register_columnfamiliy_with_cassandra()
                 mykeyspace = client.describe_keyspace(model._keyspace.name)            
         mycf = mykeyspace[model._column_family]

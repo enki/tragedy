@@ -148,6 +148,9 @@ class ForeignKey(Field):
         if hasattr(instance, 'row_key'):
             return instance.row_key
         return instance
+    
+    # def key_to_display(self, key):
+    #     return time.ctime(timestamp.fromUUID(uuid.UUID(bytes=key)))
 
 class MissingField(Field):
     def key_to_internal(self, column_key):
@@ -186,10 +189,7 @@ class JSONField(Field):
 DictField = JSONField
 ListField = JSONField
 
-class CustomIndex(BaseField):
-    pass
-
-class ObjectIndex(BaseField):
+class ManualIndex(BaseField):
     default_key = None
     autosetrow = True
     def __init__(self, target_model, *args, **kwargs):
@@ -211,7 +211,7 @@ class ObjectIndex(BaseField):
         self.doresolve()
         return self._target_model
 
-class SecondaryIndex(ObjectIndex):
+class SecondaryIndex(ManualIndex):
     autosave = True
     autosetrow = False
     def __init__(self, target_field, *args, **kwargs):
@@ -222,7 +222,7 @@ class SecondaryIndex(ObjectIndex):
         # print 'OWNER', self.target_field.get_owner()
         return self.target_field.get_owner()
 
-class AllIndex(ObjectIndex):
+class AllIndex(ManualIndex):
     autosave = True
     default_key = '!ALL!'
     def __init__(self, *args, **kwargs):

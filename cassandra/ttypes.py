@@ -1638,6 +1638,7 @@ class CfDef(object):
    - row_cache_size
    - preload_row_cache
    - key_cache_size
+   - read_repair_chance
   """
 
   thrift_spec = (
@@ -1653,9 +1654,10 @@ class CfDef(object):
     (9, TType.DOUBLE, 'row_cache_size', None, 0, ), # 9
     (10, TType.BOOL, 'preload_row_cache', None, False, ), # 10
     (11, TType.DOUBLE, 'key_cache_size', None, 200000, ), # 11
+    (12, TType.DOUBLE, 'read_repair_chance', None, 1, ), # 12
   )
 
-  def __init__(self, table=None, name=None, column_type=thrift_spec[3][4], clock_type=thrift_spec[4][4], comparator_type=thrift_spec[5][4], subcomparator_type=thrift_spec[6][4], reconciler=thrift_spec[7][4], comment=thrift_spec[8][4], row_cache_size=thrift_spec[9][4], preload_row_cache=thrift_spec[10][4], key_cache_size=thrift_spec[11][4],):
+  def __init__(self, table=None, name=None, column_type=thrift_spec[3][4], clock_type=thrift_spec[4][4], comparator_type=thrift_spec[5][4], subcomparator_type=thrift_spec[6][4], reconciler=thrift_spec[7][4], comment=thrift_spec[8][4], row_cache_size=thrift_spec[9][4], preload_row_cache=thrift_spec[10][4], key_cache_size=thrift_spec[11][4], read_repair_chance=thrift_spec[12][4],):
     self.table = table
     self.name = name
     self.column_type = column_type
@@ -1667,6 +1669,7 @@ class CfDef(object):
     self.row_cache_size = row_cache_size
     self.preload_row_cache = preload_row_cache
     self.key_cache_size = key_cache_size
+    self.read_repair_chance = read_repair_chance
 
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
@@ -1732,6 +1735,11 @@ class CfDef(object):
           self.key_cache_size = iprot.readDouble();
         else:
           iprot.skip(ftype)
+      elif fid == 12:
+        if ftype == TType.DOUBLE:
+          self.read_repair_chance = iprot.readDouble();
+        else:
+          iprot.skip(ftype)
       else:
         iprot.skip(ftype)
       iprot.readFieldEnd()
@@ -1785,6 +1793,10 @@ class CfDef(object):
     if self.key_cache_size != None:
       oprot.writeFieldBegin('key_cache_size', TType.DOUBLE, 11)
       oprot.writeDouble(self.key_cache_size)
+      oprot.writeFieldEnd()
+    if self.read_repair_chance != None:
+      oprot.writeFieldBegin('read_repair_chance', TType.DOUBLE, 12)
+      oprot.writeDouble(self.read_repair_chance)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()

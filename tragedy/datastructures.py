@@ -158,9 +158,10 @@ class _OrderedDict(dict, DictMixin):
     iteritems = DictMixin.iteritems
 
     def __repr__(self):
-        if not self:
-            return '%s()' % (self.__class__.__name__,)
-        return '%s(%r)' % (self.__class__.__name__, self.items())
+        # if not self:
+        #     return '%s()' % (self.__class__.__name__,)
+        # return '%s(%r)' % (self.__class__.__name__, self.items())
+        return 'O({' + ','.join([ "%r: %r" % (key, value) for key, value in self.items()]) + '})'
 
     def copy(self):
         return self.__class__(self)
@@ -180,7 +181,7 @@ class _OrderedDict(dict, DictMixin):
     def __ne__(self, other):
         return not self == other
 
-try:    
-    from collections import OrderedDict
-except:
-    OrderedDict = _OrderedDict
+# try:    
+#     from collections import OrderedDict
+# except:
+OrderedDict = _OrderedDict

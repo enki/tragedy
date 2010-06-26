@@ -202,7 +202,7 @@ class BasicRow(RowDefaults):
             if spec.mandatory and (self.column_values.get(column_key) is None):
                 if spec.default:
                     default = spec.get_default()
-                    self.set_value_for_columnkey(column_key, default)
+                    # self.set_value_for_columnkey(column_key, default)
                 else: #if not hasattr(self, '_default_field'): # XXX: i think this was meant to check if self is an index?
                     missing_cols.add(column_key)
                 
@@ -375,7 +375,7 @@ class BasicRow(RowDefaults):
     @classmethod
     def multiget_slice(cls, keys=None, consistency_level=None, **kwargs):
         assert keys, 'Need a non-null non-empty keys argument.'
-        print 'GETTING', cls, keys, kwargs
+        # print 'GETTING', cls, keys, kwargs
         
         predicate = cls.get_slice_predicate(**kwargs)
         key_slices = cls.getclient().multiget_slice(    #  keyspace          = str(cls._keyspace),
@@ -425,7 +425,7 @@ class BasicRow(RowDefaults):
             assert isinstance(value, basestring), 'Not basestring %s:%s (%s)' % (column_key, type(value), type(self))
             newtimestamp = self._timestamp_func()
             import time
-            print 'STORING WITH NEWTIMESTAMP', self.__class__, column_key, newtimestamp #time.ctime( int(newtimestamp) ) 
+            # print 'STORING WITH NEWTIMESTAMP', self.__class__, column_key, newtimestamp #time.ctime( int(newtimestamp) ) 
             column = Column(name=column_key, value=value, clock=Clock(timestamp=newtimestamp))
             save_columns.append( ColumnOrSuperColumn(column=column) )
         

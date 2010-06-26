@@ -1,8 +1,7 @@
 from .rows import DictRow, RowKey
 from .columns import (ByteField, 
                       TimeField,
-                      ObjectIndex,
-                      CustomIndex,
+                      ManualIndex,
                       SecondaryIndex,
                       ForeignKey,
                       BaseField,
@@ -49,9 +48,7 @@ class Model(DictRow):
     @classmethod
     def _activate_autoindexes(cls):
         for key, value in cls.__dict__.items():
-            if isinstance(value, CustomIndex):
-                pass
-            elif isinstance(value, ObjectIndex):
+            if isinstance(value, ManualIndex):
                 # print 'SCREAM', cls, key, value, value.target_field, 'Auto_%s_%s' % (value.target_model._column_family, key) 
                 default_field = value.target_model
                 if value.target_field:
@@ -61,7 +58,7 @@ class Model(DictRow):
                 default_key = getattr(value, 'default_key', None)
                 autosetrow = getattr(value, 'autosetrow', False)
                 
-                class ObjectIndexImplementation(GeneratedIndex):
+                class ManualIndexImplementation(GeneratedIndex):
                     _column_family = 'Auto_%s_%s' % (cls._column_family, key)
                     _default_field = ForeignKey(foreign_class=default_field, unique=True)
                     _index_name = key
@@ -80,7 +77,7 @@ class Model(DictRow):
                     
                     @classmethod
                     def target_saved(cls, instance):
-                        print 'AUTOSAVE', cls._column_family, cls._index_name, getattr(cls,'_target_fieldname', None), instance.row_key, instance
+                        # print 'AUTOSAVE', cls._column_family, cls._index_name, getattr(cls,'_target_fieldname', None), instance.row_key, instance
                         default_key = cls._default_key
                         # print 'WORKING WITH', cls._column_family, cls._target_fieldname, default_key
                         
@@ -97,19 +94,27 @@ class Model(DictRow):
                                 pass # not mandatory
                 
                 # print 'OHAIFUCK TARGETMODEL', cls._column_family, value.target_model 
-                setattr(ObjectIndexImplementation, cls._column_family.lower(), RowKey())
-                # print 'SETTING', cls, key, ObjectIndexImplementation
-                setattr(cls, key, ObjectIndexImplementation)
+                setattr(ManualIndexImplementation, cls._column_family.lower(), RowKey())
+                # print 'SETTING', cls, key, ManualIndexImplementation
+                setattr(cls, key, ManualIndexImplementation)
                 # print getattr(cls, key)
                 
                 if getattr(value, 'autosave', False):
-                    cls.save_hooks.add(ObjectIndexImplementation.target_saved) 
+                    cls.save_hooks.add(ManualIndexImplementation.target_saved) 
 
 class Index(DictRow):
     """A row which doesn't care about column names, and that can be appended to."""
     __abstract__ = True
-    _default_field = ByteField()
+    # _default_field = ByteField()
+    _order_by = 'TimeUUIDType'
     _ordered = True
+
+    @classmethod
+    def _init_class(cls, *args, **kwargs):
+        super(Index, cls)._init_class(*args, **kwargs)
+        if hasattr(cls, 'targetmodel'):
+            cls._default_field = cls.targetmodel
+            del cls.targetmodel
 
     def is_unique(self, target):
         if self._order_by != 'TimeUUIDType':

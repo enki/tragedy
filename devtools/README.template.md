@@ -1,13 +1,13 @@
 # Tragedy
+Tragedy 0.7-trunk by Paul Bohm <enki@bbq.io> / @enkido on twitter.
 
-Tragedy is a high-level Cassandra Object Abstraction for Python.
+A high-level Cassandra Object Abstraction for Python.
 
-The current newindex branch is a refactor to make tragedy indexes more powerful.
-Don't rely on the API too much tho, because it will change. Some of this documentation is also outdated.
+## In Development Warning
 
-Also this branch only works with the latest Cassandra trunk (0.7) checkouts.
+Tragedy currently only works with the latest Cassandra trunk checkouts (0.7). This code is already used in production, but still a moving target and expected to have bugs.
 
-## Tragedy's Data Model
+## Understanding Tragedy's Data Model
 
 In Tragedy you build your data model from Models and Indexes. An abstract *Model* specifies the kind data that can be stored in a Model-Instance. We also call a Model-Instance a Row, since specific Model-Instances are uniquely identified by their unique RowKey. Knowing the Model and RowKey is all you need to store and retrieve data from Cassandra. The attributes of the Model correspond to the Columns of a Row. Each Column has a Field-Type like StringField or IntegerField. The RowKey decides which specific Row/Model-Instance the user is referring to and on which physical machine the data is stored. If you lose a RowKey, you can never store or retrieve that data again. Any Unicode string can be used as RowKey as long as it is unique among all Rows of a Model. If there's no naturally unique identifier for the data in a Row, you can ask Tragedy to generate a UUID-RowKey for you.
 
@@ -41,15 +41,15 @@ TweetsSent is an abstract Index over Tweets sorted by Cassandra's TimeUUIDType. 
     tweets_by_user = TweetsSent(by_username='merlin').load()
 	print tweets_by_user
 
-The main difference between Indexes and Models is that Indexes keep track of an unlimited amount of ordered data of the same kind (normally ForeignKeys), whereas a Model keeps track of a limited number of data that can be any mixture of types. Indexes are most often used to to help us find Data whose RowKey we've forgotten. Models can refer to Indexes using ForeignKeys, and Indexes can refer to both Models and (less often) other Indexes. The call above gives us a list of Tweets previously posted by user 'merlin' with their RowKeys correctly set. However, since the Index only contains references the actual tweet data hasn't been loaded yet at this point. If we tried to work with those tweets, we'd see #MISSING# fields all over the place:
+The main difference between Indexes and Models is that Indexes keep track of an unlimited amount of ordered data of the same kind (normally ForeignKeys), whereas a Model keeps track of a limited number of data that can be any mixture of types. Indexes are most often used to to help us find Data whose RowKey we've forgotten. Models can refer to Indexes using ForeignKeys, and Indexes can refer to both Models and (less often) other Indexes. The call above gives us a list of Tweets previously posted by user 'merlin' with their RowKeys correctly set. However, since the Index only contains references the actual tweet data hasn't been loaded yet at this point. If we tried to work with those tweets, we'd see only empty tweets:
 
-    [<Tweet 8649a1ca4ab843b9afa6cc954908ac04: {'message': '#MISSING#', 'author': '#MISSING#'}, ...]
-
+    <TweetsSent merlin: O({'Sat Jun 26 04:18:14 2010': <Tweet 7e991c64732b4f8194d7c857f9522101: {}>})>
+    
 To actually load the tweets we need to resolve them (retrieve them using their RowKeys). Luckily Indexes have the .resolve() helper to make this easy:
 
 	tweets_by_user.resolve()
 	print tweets_by_user
-	[<Tweet ced314748d574379a817e1a1c9149789: {'message': "some message", 'author': <User merlin: {'password': '#MISSING#'}>}>
+    [<Tweet 7e991c64732b4f8194d7c857f9522101: {'message': 'tweeting from tragedy', 'author': <User 20336bbf91d5407283dd553593c38e03: {}>}>]
 
 Behind the scenes Index.resolve() almost works like calling Model.load() on all Tweets in the list. It's more efficient though, since this combines all required queries into one multiquery for faster processing. Now we've seen how to create tweets, store them, and find them again. If you want to see how you can distribute them to Followers, scroll down for a full example of a twitter-like application.
 
@@ -58,8 +58,8 @@ That's about it for the basics. There's more stuff Tragedy can do for you, like 
 ## Installation
   $ setup.py install   (optionally --cassandra to install the compiled cassandra thrift bindings)
 
-## IRC and Contact
-Come hang out on #cassandra on irc.freenode.net. Email: enki@bbq.io. Twitter: [@enkido](http://twitter.com/enkido).
+## IRC
+Come hang out on #cassandra on irc.freenode.net.
 
 ## Example (full twitter-demo)
 
