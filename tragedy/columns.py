@@ -134,6 +134,7 @@ class TimestampField(Field):
 class ForeignKey(Field):
     def __init__(self, *args, **kwargs):
         self.foreign_class = kwargs.pop('foreign_class')
+        
         self.resolve = kwargs.pop('resolve', False)
         self.unique = kwargs.pop('unique', False)
         super(ForeignKey, self).__init__(self, *args, **kwargs)
@@ -149,9 +150,15 @@ class ForeignKey(Field):
             return instance.row_key
         return instance
     
-    # def key_to_display(self, key):
-    #     return time.ctime(timestamp.fromUUID(uuid.UUID(bytes=key)))
-
+    def key_to_internal(self, key):
+        raise TragedyException('bug')
+    
+    def key_to_external(self, key):
+        raise TragedyException('bug')
+    
+    def key_to_display(self, key):
+        raise TragedyException('bug')
+    
 class MissingField(Field):
     def key_to_internal(self, column_key):
         raise TragedyException('No Specification for Key %s' % (column_key,))

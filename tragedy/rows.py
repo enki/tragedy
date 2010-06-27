@@ -426,7 +426,8 @@ class BasicRow(RowDefaults):
             assert isinstance(value, basestring), 'Not basestring %s:%s (%s)' % (column_key, type(value), type(self))
             newtimestamp = self._timestamp_func()
             import time
-            # print 'STORING WITH NEWTIMESTAMP', self.__class__, column_key, newtimestamp #time.ctime( int(newtimestamp) ) 
+            foo = self.get_spec_for_columnkey(column_key)
+            print 'STORING WITH NEWTIMESTAMP', self.__class__, repr(column_key), newtimestamp #time.ctime( int(newtimestamp) ) 
             column = Column(name=column_key, value=value, clock=Clock(timestamp=newtimestamp))
             save_columns.append( ColumnOrSuperColumn(column=column) )
         
