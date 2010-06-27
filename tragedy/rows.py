@@ -194,7 +194,7 @@ class BasicRow(RowDefaults):
         else:
             self.markChanged(column_key)
     
-    def listMissingColumns(self):
+    def listMissingColumns(self, for_saving=False):
         missing_cols = OrderedSet()
         
         for column_key, spec in self.column_spec.items():
@@ -202,7 +202,8 @@ class BasicRow(RowDefaults):
             if spec.mandatory and (self.column_values.get(column_key) is None):
                 if spec.default:
                     default = spec.get_default()
-                    # self.set_value_for_columnkey(column_key, default)
+                    if for_saving:
+                        self.set_value_for_columnkey(column_key, default)
                 else: #if not hasattr(self, '_default_field'): # XXX: i think this was meant to check if self is an index?
                     missing_cols.add(column_key)
                 
@@ -217,7 +218,7 @@ class BasicRow(RowDefaults):
     def yield_column_key_value_pairs(self, for_saving=False, **kwargs):
         access_mode = kwargs.pop('access_mode', 'to_identity')
         
-        missing_cols = self.listMissingColumns()
+        missing_cols = self.listMissingColumns(for_saving=for_saving)
         if for_saving and missing_cols:
             raise TragedyException("Columns %s mandatory but missing." % 
                         ([(ck,self.column_spec[ck]) for ck in missing_cols],))
