@@ -1,26 +1,26 @@
 from .hierarchy import (Cluster,
                         Keyspace,
                        )
-from .rows import (RowKey,
-                   )
+# from .rows import (RowKey,
+#                    )
 
 from .models import (Model,
-                     Index,
-                     TimeOrderedIndex,
+                     BaseIndex,
                     )
 
 from .columns import (BooleanField,
-                      ForeignKey,
                       UnicodeField,
                       AsciiField,
                       ByteField,
                       IntegerField,
                       FloatField,
-                      DictField,
-                      ListField,
-                      TimestampField,
-                      ManualIndex,
-                      AllIndex,
-                      SecondaryIndex,
-        		      JSONField,
+                      # DictField,
+                      # ListField,
+                      # TimestampField,
+                      ManualIndexField,
+                      AllIndexField,
+                      SecondaryIndexField,
+                      # JSONField,
+        		      RowKeySpec,
+        		      TimeSpec,
                      )

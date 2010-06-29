@@ -14,29 +14,18 @@ from .util import (gm_timestamp,
 from .hierarchy import (InventoryType,
                         cmcache,
                        )    
-from .columns import (ConvertAPI,
+from .columns import (
+                     RowKeySpec,
                      Field,
-                     ByteField,
-                     ForeignKey,
+                     # ByteField,
+                     # ForeignKeyField,
                      MissingField,
-                     TimeField,
+                     # TimeField,
                     )
 
 from .exceptions import TragedyException
 
 known_sort_orders = ('BytesType', 'AsciiType', 'UTF8Type', 'LongType', 'LexicalUUIDType', 'TimeUUIDType')
-
-class RowKey(ConvertAPI):
-    def __init__(self, *args, **kwargs):
-        self.autogenerate = kwargs.pop('autogenerate', False)
-        self.default = kwargs.pop('default', None)
-        ConvertAPI.__init__(self, *args, **kwargs)
-    
-    def value_to_internal(self, value):
-        if hasattr(value, 'row_key'):
-            value = value.row_key
-        
-        return value
 
 class RowDefaults(object):
     """Configuration Defaults for Rows."""
@@ -127,21 +116,31 @@ class BasicRow(RowDefaults):
         self.column_spec     = {}  #
         
         self.mirrors = OrderedSet()
-                
+        
         # Our Row Key
         self.row_key = row_key
+        
+        # print 'INIT ME UP', args, kwargs,  row_key, self.row_key
         
         self._row_key_name = None
         self._row_key_spec = None
         
+        # print 'INITED', self, self.row_key, self._row_key_name, self._row_key_spec
+        
         # Extract the Columnspecs
         self.extract_specs_from_class()
+        
+        # print 'MID-INITED', self, self.row_key, self._row_key_name, self._row_key_spec
+        
         
         if kwargs.get('_for_loading'):
             self._update(*args, **kwargs)
         else:
             self.update(*args, **kwargs)
-            
+        
+        # print 'POST-INITED', self, self.row_key, self._row_key_name, self._row_key_spec
+        
+        
         self.init(*args, **kwargs)
     
     def init(self, *args, **kwargs):
@@ -152,11 +151,12 @@ class BasicRow(RowDefaults):
         for attr, elem in itertools.chain(self.__class__.__dict__.iteritems(), self.__dict__.iteritems()):
             if attr[0] == '_':
                 continue
-            elif isinstance(elem, RowKey):
+            elif isinstance(elem, RowKeySpec):
+                # print 'WHOA', attr, elem
                 self._row_key_name = attr
                 self._row_key_spec = elem
-                if self.row_key:
-                    self.row_key = self._row_key_spec.value_to_internal(self.row_key)
+                # if self.row_key:
+                #     self.row_key = self._row_key_spec.to_internal(self.row_key)
                 continue
             elif not isinstance(elem, Field):
                 continue
@@ -200,11 +200,12 @@ class BasicRow(RowDefaults):
         for column_key, spec in self.column_spec.items():
             value = self.column_values.get(column_key)
             if spec.mandatory and (self.column_values.get(column_key) is None):
-                if spec.default:
-                    default = spec.get_default()
+                if spec.value.default:
+                    default = spec.value.get_default()
                     if for_saving:
                         self.set_value_for_columnkey(column_key, default)
                 else: #if not hasattr(self, '_default_field'): # XXX: i think this was meant to check if self is an index?
+                    # print column_key, spec.value, spec.value.default
                     missing_cols.add(column_key)
                 
             if value and column_key not in self.ordered_columnkeys:
@@ -226,19 +227,23 @@ class BasicRow(RowDefaults):
 
         for column_key in self.ordered_columnkeys:
             if for_saving:
-                if not (column_key in self.column_changed): # XXX: there are faster ways - profile?
+                spec = self.get_spec_for_columnkey(column_key)            
+                if getattr(spec.value, '_autoset_on_save', False):
+                   pass 
+                elif not (column_key in self.column_changed): # XXX: there are faster ways - profile?
                     continue
             assert isinstance(column_key, basestring), 'Column Key not of type string?'
             spec = self.get_spec_for_columnkey(column_key)            
             value = self.get_value_for_columnkey(column_key)
             
             if for_saving:
-                value = spec.value_for_saving(value)
+                value = spec.value.for_saving(value)
+                self.set_value_for_columnkey(column_key, value)
             
             if not (value is None):
                 column_key, value = getattr(spec, access_mode)(column_key, value)
             else:
-                column_key = getattr(spec, 'key_' + access_mode)(column_key)
+                column_key = getattr(spec.key, access_mode)(column_key)
                 
             # if value is None:
             #     continue
@@ -275,8 +280,9 @@ class BasicRow(RowDefaults):
         tmp.update(*args, **kwargs)
         
         for column_key, value in tmp.iteritems():
+            # print column_key, value
             if column_key == self._row_key_name:
-                self.row_key = self._row_key_spec.value_to_internal(value)
+                self.row_key = self._row_key_spec.value.to_internal(value)
                 continue
             spec = self.column_spec.get(column_key, self._default_field)
             column_key, value = getattr(spec, access_mode)(column_key, value)
@@ -329,9 +335,15 @@ class BasicRow(RowDefaults):
         if not kwargs['keys']:
             raise StopIteration
 
+        k = []
         for row_key in kwargs['keys']:
             assert row_key, 'Empty row_key %s' % (row_key,)
+            row_key = RowKeySpec().to_internal(row_key)
+            k.append(row_key) # XXX: make non-generic
+            
             assert isinstance(row_key, basestring), 'Row Key %s is of type %s should be basestring.' % (row_key, type(row_key,))
+        
+        kwargs['keys'] = k
         
         for row_key, columns in cls.multiget_slice(*args, **kwargs):
             columns = OrderedDict(columns)
@@ -353,6 +365,7 @@ class BasicRow(RowDefaults):
     def load(self, *args, **kwargs):
         if not self.row_key and self._row_key_spec.default:
                 self.row_key = self._row_key_spec.get_default()
+        self.row_key = self._row_key_spec.to_internal(self.row_key)
         assert self.row_key, 'No row_key and no non-null non-empty keys argument. Did you use the right row_key_name?'
         tkeys = [self.row_key]
         result = list(self.load_multi(keys=tkeys))
@@ -408,6 +421,8 @@ class BasicRow(RowDefaults):
             else:
                 raise TragedyException('No row_key set!')
         
+        self.row_key = self._row_key_spec.to_internal(self.row_key)
+        
         for save_row_key in itertools.chain((self.row_key,), self.mirrors):
             if callable(save_row_key):
                 save_row_key = save_row_key()
@@ -427,7 +442,7 @@ class BasicRow(RowDefaults):
             newtimestamp = self._timestamp_func()
             import time
             foo = self.get_spec_for_columnkey(column_key)
-            print 'STORING WITH NEWTIMESTAMP', self.__class__, repr(column_key), newtimestamp #time.ctime( int(newtimestamp) ) 
+            # print 'STORING WITH NEWTIMESTAMP', self.__class__, repr(column_key), newtimestamp #time.ctime( int(newtimestamp) ) 
             column = Column(name=column_key, value=value, clock=Clock(timestamp=newtimestamp))
             save_columns.append( ColumnOrSuperColumn(column=column) )
         
@@ -486,7 +501,7 @@ class DictRow(BasicRow):
         spec = self.get_spec_for_columnkey(column_key)
         value = self.get_value_for_columnkey(column_key)
         if not (value is None):
-            value = getattr(spec, 'value_' + access_mode)(value)
+            value = getattr(spec.value, access_mode)(value)
         else:
             value = default
         return value
