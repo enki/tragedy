@@ -2,6 +2,7 @@ from .rows import DictRow
 from .columns import (ByteField, 
                       TimeField,
                       TimeSpec,
+                      TimeStampSpec,
                       ManualIndexField,
                       SecondaryIndexField,
                       ForeignKeySpec,
@@ -67,7 +68,7 @@ class Model(DictRow):
                 
                 class ManualIndexImplementation(BaseIndex):
                     _column_family = 'Auto_%s_%s' % (cls._column_family, key)
-                    _default_field = Field(key=TimeSpec(), 
+                    _default_field = Field(key=TimeStampSpec(), 
                                            value=ForeignKeySpec(foreign_class=default_field, unique=True))
                     _index_name = key
                     _target_fieldname = target_fieldname
@@ -167,7 +168,10 @@ class BaseIndex(DictRow):
         # print 'SUPERTARGET', target, self._default_field.value.foreign_class, self._default_field.value_to_display(target)
                 
         column_key = self.get_next_column_key()
+        # print 'WTF COLUMN KEY', uuid.uuid1(), uuid.UUID(bytes=column_key).hex, target
 
+        self.load()
+        # print 'APPEND', self, target
         self._update( [(column_key, target)] )
         return self
 

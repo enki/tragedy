@@ -95,20 +95,29 @@ class TimeSpec(AutosetSpec):
             value = _nowfunc()
         return str(timestamp.exportUnix(value, self._microseconds))
 
-class TimestampSpec(AutosetSpec):
+class TimeStampSpec(AutosetSpec):
     def __init__(self, *args, **kwargs):
-        super(TimestampSpec, self).__init__(self, *args, **kwargs) 
+        super(TimeStampSpec, self).__init__(self, *args, **kwargs) 
         
-    def to_display(self, value): # called before displaying data
-        return time.ctime(timestamp.fromUUID(uuid.UUID(bytes=value)))
+    # def to_display(self, value): # called before displaying data
+    #     # print 'TO DISPLAY', time.ctime(timestamp.fromUUID(uuid.UUID(bytes=value)))
+    # 
+    #     return time.ctime(timestamp.fromUUID(uuid.UUID(bytes=value)))
 
-    def to_external(self, value):
+    def to_external(self, value):        
         return uuid.UUID(bytes=value).hex
     
     def to_internal(self, value):
+        # print 'TO INTERNAL', value
+        
         if value is None:
+            # print 'SETTING FOR FIRST TIME', value
             value = uuid.uuid1().hex
         return uuid.UUID(hex=value).bytes
+    
+    def for_saving(self, value):
+        # print 'FOR SAVING', value
+        return value
 
 class ForeignKeySpec(Spec):
     def __init__(self, *args, **kwargs):

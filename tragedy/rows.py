@@ -131,8 +131,7 @@ class BasicRow(RowDefaults):
         self.extract_specs_from_class()
         
         # print 'MID-INITED', self, self.row_key, self._row_key_name, self._row_key_spec
-        
-        
+                
         if kwargs.get('_for_loading'):
             self._update(*args, **kwargs)
         else:
@@ -272,7 +271,10 @@ class BasicRow(RowDefaults):
     
         return self._update(access_mode=access_mode, *args, **kwargs)
 
-    def _update(self, *args, **kwargs):        
+    def _update(self, *args, **kwargs):
+        # print 'UPDATE', args, kwargs
+        # import traceback
+        # traceback.print_stack()
         access_mode = kwargs.pop('access_mode', 'to_identity')
         _for_loading = kwargs.pop('_for_loading', False)
         
@@ -360,7 +362,11 @@ class BasicRow(RowDefaults):
             
         for row_key in kwargs['keys']:
             blah = unordered.get(row_key)
-            yield cls( **blah )
+            blah.pop('row_key', None)
+            access_mode = blah.pop('access_mode')
+            _for_loading = blah.pop('_for_loading')
+            
+            yield cls( row_key, blah.items(), access_mode=access_mode, _for_loading=_for_loading)
     
     def load(self, *args, **kwargs):
         if not self.row_key and self._row_key_spec.default:
@@ -369,7 +375,8 @@ class BasicRow(RowDefaults):
         assert self.row_key, 'No row_key and no non-null non-empty keys argument. Did you use the right row_key_name?'
         tkeys = [self.row_key]
         result = list(self.load_multi(keys=tkeys))
-        self._update(result[0].column_values, _for_loading=True)
+        # print 'FROB', list(result[0].yield_column_key_value_pairs())
+        self._update(list(result[0].yield_column_key_value_pairs()), _for_loading=True)
         return self
         # # print self, dir(self), self._row_key_name
         # assert self.row_key, 'No row_key and no non-null non-empty keys argument. Did you use the right row_key_name?'
@@ -442,12 +449,13 @@ class BasicRow(RowDefaults):
             newtimestamp = self._timestamp_func()
             import time
             foo = self.get_spec_for_columnkey(column_key)
-            # print 'STORING WITH NEWTIMESTAMP', self.__class__, repr(column_key), newtimestamp #time.ctime( int(newtimestamp) ) 
+            # print 'STORING WITH NEWTIMESTAMP', save_row_key, self.__class__._column_family, repr(column_key), foo.key, value, newtimestamp #time.ctime( int(newtimestamp) ) 
+            # print 'OPHAI', column_key
             column = Column(name=column_key, value=value, clock=Clock(timestamp=newtimestamp))
             save_columns.append( ColumnOrSuperColumn(column=column) )
         
         save_mutations = [Mutation(column_or_supercolumn=sc) for sc in save_columns]
-        
+                
         # self.getclient().batch_insert(#keyspace         = str(self._keyspace),
         #                          key              = save_row_key,
         #                          cfmap            = {self._column_family: save_columns},
