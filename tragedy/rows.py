@@ -374,7 +374,7 @@ class BasicRow(RowDefaults):
         self.row_key = self._row_key_spec.to_internal(self.row_key)
         assert self.row_key, 'No row_key and no non-null non-empty keys argument. Did you use the right row_key_name?'
         tkeys = [self.row_key]
-        result = list(self.load_multi(keys=tkeys))
+        result = list(self.load_multi(keys=tkeys, *args, **kwargs))
         # print 'FROB', list(result[0].yield_column_key_value_pairs())
         self._update(list(result[0].yield_column_key_value_pairs()), _for_loading=True)
         return self
