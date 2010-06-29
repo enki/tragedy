@@ -161,6 +161,7 @@ class JSONSpec(Spec):
 
 class RowKeySpec(Spec):
     def __init__(self, *args, **kwargs):
+        self.value = self
         self.autogenerate = kwargs.pop('autogenerate', False)
         self.default = kwargs.pop('default', None)
         Spec.__init__(self, *args, **kwargs)

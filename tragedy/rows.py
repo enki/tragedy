@@ -282,7 +282,7 @@ class BasicRow(RowDefaults):
         for column_key, value in tmp.iteritems():
             # print column_key, value
             if column_key == self._row_key_name:
-                self.row_key = self._row_key_spec.value.to_internal(value)
+                self.row_key = self._row_key_spec.to_internal(value)
                 continue
             spec = self.column_spec.get(column_key, self._default_field)
             column_key, value = getattr(spec, access_mode)(column_key, value)
