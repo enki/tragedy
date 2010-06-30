@@ -36,7 +36,7 @@ class MissingField(Field):
     value = MissingSpec()
 
 class ByteField(Field):
-    key = AsciiSpec()
+    key = UnicodeSpec()
     value = AsciiSpec()
 
 class UnicodeField(Field):
