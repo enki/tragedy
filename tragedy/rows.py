@@ -319,7 +319,7 @@ class BasicRow(RowDefaults):
         return d
     
     @staticmethod
-    def get_slice_predicate(column_names=None, start='', finish='', reverse=True, count=10000, *args, **kwargs):
+    def get_slice_predicate(column_names=None, start='', finish='', reverse=False, count=10000, *args, **kwargs):
         if column_names:
             return SlicePredicate(column_names=columns)
             
