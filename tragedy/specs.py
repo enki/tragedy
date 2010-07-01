@@ -1,10 +1,12 @@
 import time
-import uuid
+# import uuid
 from . import timestamp
 from datetime import datetime
 import simplejson as json
 from .exceptions import TragedyException
 from .hierarchy import cmcache
+
+import myuuid as uuid # FIXME: this reverses the timestamp order - probably a really bad idea.
 
 class Spec(object):
     default = False

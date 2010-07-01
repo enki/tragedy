@@ -30,7 +30,7 @@ Tweet instances are referred to and accessed by a RowKey. Tweet's RowKey is name
 
 	class TweetsSent(Index):
     	by_username = RowKey()
-    	targetmodel = ForeignKey(foreign_class=Tweet, compare_with='TimeUUIDType')
+    	targetmodel = ForeignKey(foreign_class=Tweet)
 
 	merlinIndex = TweetsSent(by_username='merlin')
 	merlinIndex.append(new_tweet)
@@ -84,7 +84,7 @@ Come hang out on #cassandra on irc.freenode.net.
     # 
     # class TweetsSent(BaseIndex):
     #   by_username = RowKeySpec()
-    #   targetmodel = ForeignKey(foreign_class=Tweet, compare_with='TimeUUIDType')
+    #   targetmodel = ForeignKey(foreign_class=Tweet)
     
     # class UserIndex(BaseIndex):
         

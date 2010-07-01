@@ -23,8 +23,8 @@ class Model(DictRow):
         for key, value in self.__class__.__dict__.items():
             # print 'BLAH', key, GeneratedIndex in getattr(value, '__bases__', ())
             if getattr(value, '_generated', None) and \
-                   not getattr(value, '_default_key', None) and getattr(value, '_autosetrow', False):
-                # print 'OHAI INIT', self, key, value
+                   (not getattr(value, '_default_key', None)) and getattr(value, 'autosetrow', False):
+                print 'OHAI INIT', self, key, value
                 bah = value(row_key=lambda: self.row_key)
                 setattr(self, key, bah)
                 # print 'FROB', bah
@@ -63,8 +63,9 @@ class Model(DictRow):
                 else:
                     target_fieldname = None
                 default_key = getattr(value, 'default_key', None)
+                # print 'AUTOSETROW', cls._column_family, getattr(value, 'autosetrow')
                 autosetrow = getattr(value, 'autosetrow', False)
-                order_by = getattr(value, 'order_by', 'TimeUUIDType')
+                # order_by = getattr(value, 'order_by', 'TimeUUIDType')
                 
                 class ManualIndexImplementation(BaseIndex):
                     _column_family = 'Auto_%s_%s' % (cls._column_family, key)
@@ -74,7 +75,7 @@ class Model(DictRow):
                     _target_fieldname = target_fieldname
                     _default_key = default_key
                     _autosetrow = autosetrow
-                    _order_by = order_by
+                    # _order_by = order_by
                     _generated = True
                     
                     def __init__(self, *args, **kwargs):
@@ -98,17 +99,19 @@ class Model(DictRow):
                     
                     @classmethod
                     def target_saved(cls, instance):
-                        # print 'AUTOSAVE', cls._column_family, cls._index_name, getattr(cls,'_target_fieldname', None), instance.row_key, instance
+                        print 'AUTOSAVE', cls._column_family, cls._index_name, getattr(cls,'_target_fieldname', None), instance.row_key, instance
                         default_key = cls._default_key
-                        # print 'WORKING WITH', cls._column_family, cls._target_fieldname, default_key
+                        print 'WORKING WITH', cls._column_family, cls._target_fieldname, default_key
                         
                         if default_key:
                             cls(default_key).append(instance).save()
                         else:
                             seckey = instance.get(cls._target_fieldname)
                             mandatory = getattr(getattr(instance, cls._target_fieldname), 'mandatory', False)
+                            print 'FINAL KEY', seckey
                             if seckey:
                                 cls( seckey ).append(instance).save()
+                                print 'WHOA SAVED', cls(seckey).load()
                             elif (not seckey) and mandatory:
                                 raise TragedyException('Mandatory Secondary Field %s not present!' % (cls._target_fieldname,))
                             else:
@@ -116,7 +119,7 @@ class Model(DictRow):
                 
                 # print 'OHAIFUCK TARGETMODEL', cls._column_family, value.target_model 
                 setattr(ManualIndexImplementation, cls._column_family.lower(), RowKeySpec())
-                # print 'SETTING', cls, key, ManualIndexImplementation
+                print 'SETTING', cls, key, ManualIndexImplementation
                 setattr(cls, key, ManualIndexImplementation)
                 # print getattr(cls, key)
                 
@@ -141,8 +144,8 @@ class BaseIndex(DictRow):
             del cls.targetmodel
 
     def is_unique(self, target):
-        if self._order_by != 'TimeUUIDType':
-            return True
+        # if self._order_by != 'TimeUUIDType':
+        #     return True
             
         MAXCOUNT = 20000000
         self.load(count=MAXCOUNT) # XXX: we will blow up here at some point
@@ -154,11 +157,11 @@ class BaseIndex(DictRow):
         return True
         
     def get_next_column_key(self):
-        assert self._order_by == 'TimeUUIDType', 'Append makes no sense for sort order %s' % (self._order_by,)
+        # assert self._order_by == 'TimeUUIDType', 'Append makes no sense for sort order %s' % (self._order_by,)
         return uuid.uuid1().bytes
         
     def append(self, target):
-        assert self._order_by == 'TimeUUIDType', 'Append makes no sense for sort order %s' % (self._order_by,)
+        # assert self._order_by == 'TimeUUIDType', 'Append makes no sense for sort order %s' % (self._order_by,)
         if (self._default_field.value.unique and not self.is_unique(target)):
             return self
         

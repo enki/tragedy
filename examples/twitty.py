@@ -19,7 +19,7 @@ class Tweet(Model):
 
 class TweetsSent(BaseIndex):
   by_username = RowKeySpec()
-  targetmodel = ForeignKeyField(foreign_class=Tweet, compare_with='TimeUUIDType')
+  targetmodel = ForeignKeyField(foreign_class=Tweet)
 
 def run():
     # Connect to cassandra
