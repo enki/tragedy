@@ -427,6 +427,8 @@ class BasicRow(RowDefaults):
                 self.row_key = self._row_key_spec.get_default()
             else:
                 raise TragedyException('No row_key set!')
+            
+            self.column_changed = dict([(k, True) for k in self.column_values.keys()])
         
         self.row_key = self._row_key_spec.to_internal(self.row_key)
         

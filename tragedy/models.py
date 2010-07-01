@@ -111,7 +111,7 @@ class Model(DictRow):
                             print 'FINAL KEY', seckey
                             if seckey:
                                 cls( seckey ).append(instance).save()
-                                print 'WHOA SAVED', cls(seckey).load()
+                                # print 'WHOA SAVED', cls(seckey).load()
                             elif (not seckey) and mandatory:
                                 raise TragedyException('Mandatory Secondary Field %s not present!' % (cls._target_fieldname,))
                             else:
