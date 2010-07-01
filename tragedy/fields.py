@@ -20,7 +20,10 @@ class Field(object):
         return self._owner
     
     def to_internal(self, key, value):
-        return (self.key.to_internal(key), self.value.to_internal(value))
+        print 'KEY', key, 'VALUE', value
+        ki = self.key.to_internal(key)
+        kv = self.value.to_internal(value)
+        return (ki, kv)
     
     def to_identity(self, key, value):
         return (self.key.to_identity(key), self.value.to_identity(value))
