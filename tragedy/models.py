@@ -14,6 +14,8 @@ from .exceptions import TragedyException
 
 from .hierarchy import cmcache
 
+from .util import buchtimer
+
 class Model(DictRow):
     _auto_timestamp = True
     __abstract__ = True
@@ -119,7 +121,7 @@ class Model(DictRow):
                 
                 # print 'OHAIFUCK TARGETMODEL', cls._column_family, value.target_model 
                 setattr(ManualIndexImplementation, cls._column_family.lower(), RowKeySpec())
-                print 'SETTING', cls, key, ManualIndexImplementation
+                # print 'SETTING', cls, key, ManualIndexImplementation
                 setattr(cls, key, ManualIndexImplementation)
                 # print getattr(cls, key)
                 
@@ -146,6 +148,7 @@ class BaseIndex(DictRow):
     def is_unique(self, target):
         # if self._order_by != 'TimeUUIDType':
         #     return True
+        return True
             
         MAXCOUNT = 20000000
         self.load(count=MAXCOUNT) # XXX: we will blow up here at some point
@@ -160,7 +163,9 @@ class BaseIndex(DictRow):
         # assert self._order_by == 'TimeUUIDType', 'Append makes no sense for sort order %s' % (self._order_by,)
         return uuid.uuid1().bytes
         
+    @buchtimer()
     def append(self, target):
+        # print 'ASKED TO APPEND'
         # assert self._order_by == 'TimeUUIDType', 'Append makes no sense for sort order %s' % (self._order_by,)
         if (self._default_field.value.unique and not self.is_unique(target)):
             return self
@@ -173,7 +178,7 @@ class BaseIndex(DictRow):
         column_key = self.get_next_column_key()
         # print 'WTF COLUMN KEY', uuid.uuid1(), uuid.UUID(bytes=column_key).hex, target
 
-        self.load()
+        # self.load()
         # print 'APPEND', self, target
         self._update( [(column_key, target)] )
         return self

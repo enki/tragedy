@@ -27,6 +27,8 @@ from .exceptions import TragedyException
 
 known_sort_orders = ('BytesType', 'AsciiType', 'UTF8Type', 'LongType', 'LexicalUUIDType', 'TimeUUIDType')
 
+from .util import buchtimer
+
 class RowDefaults(object):
     """Configuration Defaults for Rows."""
     __metaclass__ = InventoryType # register with the inventory
@@ -330,8 +332,9 @@ class BasicRow(RowDefaults):
     def decodeColumn(colOrSuper):
         # print 'DECODE', colOrSuper.column.name, colOrSuper.column.clock
         return (colOrSuper.column.name, colOrSuper.column.value)
-        
+    
     @classmethod
+    @buchtimer()    
     def load_multi(cls, ordered=True, *args, **kwargs):
         unordered = {}
         if not kwargs['keys']:
@@ -346,6 +349,8 @@ class BasicRow(RowDefaults):
             assert isinstance(row_key, basestring), 'Row Key %s is of type %s should be basestring.' % (row_key, type(row_key,))
         
         kwargs['keys'] = k
+        
+        # print 'LOADMULTI', kwargs['keys']
         
         for row_key, columns in cls.multiget_slice(*args, **kwargs):
             columns = OrderedDict(columns)
@@ -416,7 +421,10 @@ class BasicRow(RowDefaults):
     def generate_row_key(self):
         self.row_key = uuid.uuid4().hex
 
+    @buchtimer()
     def save(self, *args, **kwargs):
+        # print '=' * 30
+        # print 'ASKED TO SAVE', self._column_family, args, kwargs
         if not kwargs.get('write_consistency_level'):
             kwargs['write_consistency_level'] = None
         
@@ -438,14 +446,21 @@ class BasicRow(RowDefaults):
             self._real_save(save_row_key=save_row_key, *args, **kwargs)
         
         for hook in self.save_hooks:
+            # print 'CALLING HOOK', hook
             hook(self)
         
         self._beensaved = True
         
+        # print '-ByE' + '-' * 30
+        
         return self
         
+    
+    @buchtimer()
     def _real_save(self, save_row_key=None, *args, **kwargs):
         save_columns = []
+        if not self.column_changed:
+            print 'NOT SAVING', self._column_family, self.column_changed
         for column_key, value in self.yield_column_key_value_pairs(for_saving=True):
             assert isinstance(value, basestring), 'Not basestring %s:%s (%s)' % (column_key, type(value), type(self))
             newtimestamp = self._timestamp_func()
@@ -455,7 +470,8 @@ class BasicRow(RowDefaults):
             # print 'OPHAI', column_key
             column = Column(name=column_key, value=value, clock=Clock(timestamp=newtimestamp))
             save_columns.append( ColumnOrSuperColumn(column=column) )
-        
+
+        # print '_REAL_SAVE', self._column_family, save_row_key, save_columns
         save_mutations = [Mutation(column_or_supercolumn=sc) for sc in save_columns]
                 
         # self.getclient().batch_insert(#keyspace         = str(self._keyspace),

@@ -20,7 +20,7 @@ class Field(object):
         return self._owner
     
     def to_internal(self, key, value):
-        print 'KEY', key, 'VALUE', value
+        # print 'KEY', key, 'VALUE', value
         ki = self.key.to_internal(key)
         kv = self.value.to_internal(value)
         return (ki, kv)
@@ -55,7 +55,7 @@ class TimeField(Field):
 
 class BooleanField(Field):
     key = UnicodeSpec()
-    value = TimeSpec()
+    value = BooleanSpec()
 
 class AsciiField(Field):
     key = UnicodeSpec()
