@@ -217,7 +217,7 @@ class BasicRow(RowDefaults):
     def isComplete(self):
         return not self.listMissingColumns()
     
-    def yield_column_key_value_pairs(self, for_saving=False, **kwargs):
+    def yield_column_key_value_pairs(self, with_row_key=False, for_saving=False, **kwargs):
         access_mode = kwargs.pop('access_mode', 'to_identity')
         
         missing_cols = self.listMissingColumns(for_saving=for_saving)
@@ -225,6 +225,8 @@ class BasicRow(RowDefaults):
             raise TragedyException("Columns %s mandatory but missing." % 
                         ([(ck,self.column_spec[ck]) for ck in missing_cols],))
 
+        if with_row_key:
+            yield (self._row_key_name, self.row_key)
 
         for column_key in self.ordered_columnkeys:
             if for_saving:
