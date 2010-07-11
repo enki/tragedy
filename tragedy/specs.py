@@ -2,7 +2,7 @@ import time
 # import uuid
 from . import timestamp
 from datetime import datetime
-import simplejson as json
+from .util import jsondumps, jsonloads
 from .exceptions import TragedyException
 from .hierarchy import cmcache
 
@@ -165,10 +165,10 @@ class BooleanSpec(Spec):
 
 class JSONSpec(Spec):
     def to_internal(self, value):
-        return json.dumps(value)
+        return jsondumps(value)
     
     def to_external(self, value):
-        return json.loads(value)
+        return jsonloads(value)
 
 class RowKeySpec(Spec):
     def __init__(self, *args, **kwargs):

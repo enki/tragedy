@@ -58,7 +58,10 @@ class Model(DictRow):
     def _activate_autoindexes(cls):
         for key, value in cls.__dict__.items():
             if isinstance(value, ManualIndexField):
-                # print 'SCREAM', cls, key, value, value.target_field, value.target_model, 'Auto_%s_%s' % (value.target_model._column_family, key) 
+                # print 'SCREAM', cls, key, value, value.target_field,getattr(value.target_field,'_name',None), value.target_model, 'Auto_%s_%s' % (value.target_model._column_family, key) 
+                row_key_name = getattr(value.target_field,'_name',None)
+                row_key_name = row_key_name if row_key_name else cls._column_family.lower()
+                
                 default_field = value.target_model
                 if value.target_field:
                     target_fieldname = getattr(value.target_field, '_name', None)
@@ -78,6 +81,7 @@ class Model(DictRow):
                     _default_key = default_key
                     _autosetrow = autosetrow
                     # _order_by = order_by
+                    _row_key_name = row_key_name
                     _generated = True
                     
                     def __init__(self, *args, **kwargs):
@@ -120,7 +124,7 @@ class Model(DictRow):
                                 pass # not mandatory
                 
                 # print 'OHAIFUCK TARGETMODEL', cls._column_family, value.target_model 
-                setattr(ManualIndexImplementation, cls._column_family.lower(), RowKeySpec())
+                setattr(ManualIndexImplementation, row_key_name, RowKeySpec())
                 # print 'SETTING', cls, key, ManualIndexImplementation
                 setattr(cls, key, ManualIndexImplementation)
                 # print getattr(cls, key)
@@ -137,6 +141,11 @@ class BaseIndex(DictRow):
 
     def __call__(*args, **kwargs):
         print 'calling this baseindex instance is deprecated'
+
+    def __init__(self, *args, **kwargs):
+        # print 'BASEINDEX INIT'        
+        super(BaseIndex, self).__init__(*args, **kwargs)
+        # print 'NOW WE DO3', self._row_key_name
 
     @classmethod
     def _init_class(cls, *args, **kwargs):

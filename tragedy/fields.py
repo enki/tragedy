@@ -10,7 +10,9 @@ class Field(object):
         self.value = kwargs.pop('value', self.value)
         assert self.key
         assert self.value
-    
+        self.config = {}
+        self.config.update(kwargs)
+
     def set_owner_and_name(self, owner, name):
         self._owner = owner
         self._name = name
@@ -47,6 +49,7 @@ class UnicodeField(Field):
     value = UnicodeSpec() 
 
 class TimeField(Field):
+    is_datetime = True
     def __init__(self, *args, **kwargs):
         self.key = UnicodeSpec(*args, **kwargs)
         self.value = TimeSpec(*args, **kwargs)

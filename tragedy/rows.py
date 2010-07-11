@@ -10,6 +10,7 @@ from .datastructures import (OrderedSet,
                             )
 from .util import (gm_timestamp, 
                    CASPATHSEP,
+                   jsondumps
                   )
 from .hierarchy import (InventoryType,
                         cmcache,
@@ -111,6 +112,7 @@ class BasicRow(RowDefaults):
 # ----- INIT -----
 
     def __init__(self, row_key=None, *args, **kwargs):
+        # print 'BASIC ROW INIT'
         # Storage
         self.ordered_columnkeys = OrderedSet()
         self.column_values    = {}  #
@@ -127,10 +129,16 @@ class BasicRow(RowDefaults):
         self._row_key_name = None
         self._row_key_spec = None
         
+        # print 'NOW WE DO', self._row_key_name
+        
+        
         # print 'INITED', self, self.row_key, self._row_key_name, self._row_key_spec
         
         # Extract the Columnspecs
         self.extract_specs_from_class()
+        
+        # print 'NOW WE DOX1', self._row_key_name
+        
         
         # print 'MID-INITED', self, self.row_key, self._row_key_name, self._row_key_spec
                 
@@ -139,10 +147,14 @@ class BasicRow(RowDefaults):
         else:
             self.update(*args, **kwargs)
         
+        # print 'NOW WE DOX2', self._row_key_name
+        
         # print 'POST-INITED', self, self.row_key, self._row_key_name, self._row_key_spec
         
         
         self.init(*args, **kwargs)
+        
+        # print 'NOW WE DOX3', self._row_key_name
     
     def init(self, *args, **kwargs):
         pass
@@ -153,7 +165,7 @@ class BasicRow(RowDefaults):
             if attr[0] == '_':
                 continue
             elif isinstance(elem, RowKeySpec):
-                # print 'WHOA', attr, elem
+                # print 'WHOA ROWKEY', attr, elem
                 self._row_key_name = attr
                 self._row_key_spec = elem
                 # if self.row_key:
@@ -187,6 +199,11 @@ class BasicRow(RowDefaults):
 
     def set_value_for_columnkey(self, column_key, value, dont_mark=False):
         assert isinstance(column_key, basestring), "Column Key needs to be a string."
+        if column_key == 'row_key':
+            # raise TragedyException('ROW_KEY CANT BE SET HERE %s %s' % (column_key, value))
+            self.row_key = value
+            return
+            
         self.ordered_columnkeys.add(column_key)
         self.column_values[column_key] = value
         
@@ -217,7 +234,7 @@ class BasicRow(RowDefaults):
     def isComplete(self):
         return not self.listMissingColumns()
     
-    def yield_column_key_value_pairs(self, with_row_key=False, for_saving=False, **kwargs):
+    def yield_column_key_value_pairs(self, with_row_key=False, for_saving=False, with_private=True, **kwargs):
         access_mode = kwargs.pop('access_mode', 'to_identity')
         
         missing_cols = self.listMissingColumns(for_saving=for_saving)
@@ -239,6 +256,10 @@ class BasicRow(RowDefaults):
             spec = self.get_spec_for_columnkey(column_key)            
             value = self.get_value_for_columnkey(column_key)
             
+            # print 'WHXT', column_key, spec
+            if spec.config.get('private'):
+                continue
+            
             if for_saving:
                 value = spec.value.for_saving(value)
                 self.set_value_for_columnkey(column_key, value)
@@ -254,19 +275,44 @@ class BasicRow(RowDefaults):
             yield column_key, value
 
     def __iter__(self):
-        return self.yield_column_key_value_pairs(access_mode='to_external')
+        return self.iteritems()
 
     def keys(self):
-        return self.ordered_columnkeys
+        return list(self.iterkeys())
 
     def values(self):
-        return [self.column_values[x] for x in self.ordered_columnkeys]
+        return list(self.itervalues())
 
     def iterkeys(self):
-        return ( (x, self.column_values[x]) for x in self.ordered_columnkeys)
+        return (x for x in self.ordered_columnkeys)
     
     def itervalues(self):
-        return (self.column_values[x] for x in self.ordered_columnkeys)
+        return (y for x,y in self.iteritems())
+
+    def iteritems(self, *args, **kwargs):
+        if not kwargs.get('access_mode'):
+            kwargs['access_mode'] = 'to_external'
+        return self.yield_column_key_value_pairs(*args, **kwargs)
+
+    def toDICT(self, recurse=1, with_private=False):
+        data = {}
+        if recurse >= 0:
+            self.load()
+        for key, value in self.iteritems(with_row_key=True, with_private=with_private):
+            if (key != self._row_key_name) and ( getattr(self.column_spec[key],'is_datetime',None)):
+                value = self.get(key, access_mode='to_identity')
+            
+            if hasattr(value, 'toDICT'):
+                if recurse >= 0:
+                    value = value.toDICT(recurse=recurse - 1)
+                else:
+                    value = {}
+            data[key] = value
+        return data
+
+    def toJSON(self, recurse=1):
+        data = self.toDICT(recurse=recurse)
+        return jsondumps(data)
 
 # ----- Change Data -----
 
@@ -287,6 +333,10 @@ class BasicRow(RowDefaults):
         
         for column_key, value in tmp.iteritems():
             # print column_key, value
+            if column_key == 'row_key':
+                self.row_key = self._row_key_spec.to_internal(value)
+                continue
+                    
             if column_key == self._row_key_name:
                 self.row_key = self._row_key_spec.to_internal(value)
                 continue
@@ -369,10 +419,13 @@ class BasicRow(RowDefaults):
             
         for row_key in kwargs['keys']:
             blah = unordered.get(row_key)
-            blah.pop('row_key', None)
-            access_mode = blah.pop('access_mode')
-            _for_loading = blah.pop('_for_loading')
+            # print 'WHUT', blah, blah.pop(cls._row_key_name, None)
+            # print 'WHUT', blah, blah.pop('row_key', None)
             
+            access_mode = blah.pop('access_mode','to_identity')
+            _for_loading = blah.pop('_for_loading', True)
+            
+            print 'WELL WELL WELL', blah.items()
             yield cls( row_key, blah.items(), access_mode=access_mode, _for_loading=_for_loading)
     
     def load(self, *args, **kwargs):
@@ -381,6 +434,7 @@ class BasicRow(RowDefaults):
         self.row_key = self._row_key_spec.to_internal(self.row_key)
         assert self.row_key, 'No row_key and no non-null non-empty keys argument. Did you use the right row_key_name?'
         tkeys = [self.row_key]
+        print 'AHAH', self.row_key, self._row_key_name, args, kwargs
         result = list(self.load_multi(keys=tkeys, *args, **kwargs))
         # print 'FROB', list(result[0].yield_column_key_value_pairs())
         self._update(list(result[0].yield_column_key_value_pairs()), _for_loading=True)
@@ -512,6 +566,12 @@ class BasicRow(RowDefaults):
 class DictRow(BasicRow):
     """Row with a public dictionary interface to set and get columns."""
     __abstract__ = True
+    
+    def __init__(self, *args, **kwargs):
+        # print 'DICTROW INIT'
+        super(DictRow, self).__init__(*args, **kwargs)
+        # print 'NOW WE DO2', self._row_key_name
+        
     
     def __getitem__(self, column_key):
         value = self.get(column_key)
