@@ -143,6 +143,8 @@ class BasicRow(RowDefaults):
         # print 'MID-INITED', self, self.row_key, self._row_key_name, self._row_key_spec
                 
         if kwargs.get('_for_loading'):
+            self._beensaved = True  # having both of these here kinda is redundant
+            self._beenloaded = True # but also makes sense and is nonsense.. oh well...
             self._update(*args, **kwargs)
         else:
             self.update(*args, **kwargs)
@@ -198,7 +200,7 @@ class BasicRow(RowDefaults):
         return self.column_values.get(column_key)
 
     def set_value_for_columnkey(self, column_key, value, dont_mark=False):
-        assert isinstance(column_key, basestring), "Column Key needs to be a string."
+        assert isinstance(column_key, basestring), "Column Key needs to be a string."            
         if column_key == 'row_key':
             # raise TragedyException('ROW_KEY CANT BE SET HERE %s %s' % (column_key, value))
             self.row_key = value
@@ -214,19 +216,23 @@ class BasicRow(RowDefaults):
     
     def listMissingColumns(self, for_saving=False):
         missing_cols = OrderedSet()
+        dummy = object()
         
         for column_key, spec in self.column_spec.items():
-            value = self.column_values.get(column_key)
-            if spec.mandatory and (self.column_values.get(column_key) is None):
-                if spec.value.default:
-                    default = spec.value.get_default()
-                    if for_saving:
-                        self.set_value_for_columnkey(column_key, default)
-                else: #if not hasattr(self, '_default_field'): # XXX: i think this was meant to check if self is an index?
-                    # print column_key, spec.value, spec.value.default
-                    missing_cols.add(column_key)
+            value = self.column_values.get(column_key, dummy)
+            if spec.mandatory:
+                if (self.column_values.get(column_key) is None):
+                    if spec.value.default:
+                        default = spec.value.get_default()
+                        if for_saving:
+                            self.set_value_for_columnkey(column_key, default)
+                    else: #if not hasattr(self, '_default_field'): # XXX: i think this was meant to check if self is an index?
+                        # print column_key, spec.value, spec.value.default
+                        missing_cols.add(column_key)
+                else:
+                    self.ordered_columnkeys.add(column_key)
                 
-            if value and column_key not in self.ordered_columnkeys:
+            if (not value is dummy) and column_key not in self.ordered_columnkeys:
                 raise TragedyException('Value set, but column_key not in ordered_columnkeys. WTF?')
         
         return missing_cols
@@ -235,9 +241,13 @@ class BasicRow(RowDefaults):
         return not self.listMissingColumns()
     
     def yield_column_key_value_pairs(self, with_row_key=False, for_saving=False, with_private=True, **kwargs):
+        # print 'YIELDEDIDOO'
+        # if self.column_spec:
+            # print 'OPHAI', self.column_spec, self.ordered_columnkeys
         access_mode = kwargs.pop('access_mode', 'to_identity')
         
         missing_cols = self.listMissingColumns(for_saving=for_saving)
+        # print 'WHAT IS AMISS', missing_cols
         if for_saving and missing_cols:
             raise TragedyException("Columns %s mandatory but missing." % 
                         ([(ck,self.column_spec[ck]) for ck in missing_cols],))
@@ -251,6 +261,7 @@ class BasicRow(RowDefaults):
                 if getattr(spec.value, '_autoset_on_save', False):
                    pass 
                 elif not (column_key in self.column_changed): # XXX: there are faster ways - profile?
+                    # print 'COLUMN NOT CHANGED? HAH', column_key, self.column_changed
                     continue
             assert isinstance(column_key, basestring), 'Column Key not of type string?'
             spec = self.get_spec_for_columnkey(column_key)            
@@ -299,6 +310,7 @@ class BasicRow(RowDefaults):
         if recurse >= 0:
             self.load()
         for key, value in self.iteritems(with_row_key=True, with_private=with_private):
+            # print 'TRAVERSE', key, value
             if (key != self._row_key_name) and ( getattr(self.column_spec[key],'is_datetime',None)):
                 value = self.get(key, access_mode='to_identity')
             
@@ -343,6 +355,10 @@ class BasicRow(RowDefaults):
             spec = self.column_spec.get(column_key, self._default_field)
             column_key, value = getattr(spec, access_mode)(column_key, value)
             self.set_value_for_columnkey(column_key, value, dont_mark=_for_loading)
+        
+        if not self._beensaved:
+            for column_key in self.column_values:
+                self.markChanged(column_key)
 
     def markChanged(self, column_key):
         self.column_changed[column_key] = True
@@ -357,7 +373,7 @@ class BasicRow(RowDefaults):
         spec = self.get_spec_for_columnkey(column_key)
         if spec.mandatory:
             raise TragedyException('Trying to delete mandatory column %s' % (column_key,))
-        del self.column_value[column_key]
+        del self.column_values[column_key]
 
 # ----- Load Data -----
 
@@ -373,7 +389,7 @@ class BasicRow(RowDefaults):
         return d
     
     @staticmethod
-    def get_slice_predicate(column_names=None, start='', finish='', reverse=False, count=10000, *args, **kwargs):
+    def get_slice_predicate(column_names=None, start='', finish='', reverse=False, count=20, *args, **kwargs):
         if column_names:
             return SlicePredicate(column_names=columns)
             
@@ -425,7 +441,6 @@ class BasicRow(RowDefaults):
             access_mode = blah.pop('access_mode','to_identity')
             _for_loading = blah.pop('_for_loading', True)
             
-            print 'WELL WELL WELL', blah.items()
             yield cls( row_key, blah.items(), access_mode=access_mode, _for_loading=_for_loading)
     
     def load(self, *args, **kwargs):
@@ -434,7 +449,7 @@ class BasicRow(RowDefaults):
         self.row_key = self._row_key_spec.to_internal(self.row_key)
         assert self.row_key, 'No row_key and no non-null non-empty keys argument. Did you use the right row_key_name?'
         tkeys = [self.row_key]
-        print 'AHAH', self.row_key, self._row_key_name, args, kwargs
+        # print 'AHAH', self.row_key, self._row_key_name, args, kwargs
         result = list(self.load_multi(keys=tkeys, *args, **kwargs))
         # print 'FROB', list(result[0].yield_column_key_value_pairs())
         self._update(list(result[0].yield_column_key_value_pairs()), _for_loading=True)
@@ -479,8 +494,10 @@ class BasicRow(RowDefaults):
 
     @buchtimer()
     def save(self, *args, **kwargs):
+        if kwargs.pop('force_save', False):
+            self._beensaved = False
         # print '=' * 30
-        # print 'ASKED TO SAVE', self._column_family, args, kwargs
+        # print 'ASKED TO SAVE', self._column_family, args, kwargs, self.column_changed
         if not kwargs.get('write_consistency_level'):
             kwargs['write_consistency_level'] = None
         

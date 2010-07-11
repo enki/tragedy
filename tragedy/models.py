@@ -105,9 +105,9 @@ class Model(DictRow):
                     
                     @classmethod
                     def target_saved(cls, instance):
-                        print 'AUTOSAVE', cls._column_family, cls._index_name, getattr(cls,'_target_fieldname', None), instance.row_key, instance
+                        # print 'AUTOSAVE', cls._column_family, cls._index_name, getattr(cls,'_target_fieldname', None), instance.row_key, instance
                         default_key = cls._default_key
-                        print 'WORKING WITH', cls._column_family, cls._target_fieldname, default_key
+                        # print 'WORKING WITH', cls._column_family, cls._target_fieldname, default_key
                         
                         if default_key:
                             cls(default_key).append(instance).save()
@@ -121,6 +121,7 @@ class Model(DictRow):
                             elif (not seckey) and mandatory:
                                 raise TragedyException('Mandatory Secondary Field %s not present!' % (cls._target_fieldname,))
                             else:
+                                print 'SKIPPING'
                                 pass # not mandatory
                 
                 # print 'OHAIFUCK TARGETMODEL', cls._column_family, value.target_model 
@@ -154,19 +155,19 @@ class BaseIndex(DictRow):
             cls._default_field = cls.targetmodel
             del cls.targetmodel
 
-    def is_unique(self, target):
-        # if self._order_by != 'TimeUUIDType':
-        #     return True
-        return True
-            
-        MAXCOUNT = 20000000
-        self.load(count=MAXCOUNT) # XXX: we will blow up here at some point
-                                  # i don't know where the real limit is yet.
-        assert len(self.column_values) < MAXCOUNT - 1, 'Too many keys to enforce sorted uniqueness!'
-        mytarget = self._default_field.value.to_internal(target)
-        if mytarget in self.itervalues():
-            return False
-        return True
+    # def is_unique(self, target):
+    #     # if self._order_by != 'TimeUUIDType':
+    #     #     return True
+    #     return True
+    #         
+    #     MAXCOUNT = 20000000
+    #     self.load(count=MAXCOUNT) # XXX: we will blow up here at some point
+    #                               # i don't know where the real limit is yet.
+    #     assert len(self.column_values) < MAXCOUNT - 1, 'Too many keys to enforce sorted uniqueness!'
+    #     mytarget = self._default_field.value.to_internal(target)
+    #     if mytarget in self.itervalues():
+    #         return False
+    #     return True
         
     def get_next_column_key(self):
         # assert self._order_by == 'TimeUUIDType', 'Append makes no sense for sort order %s' % (self._order_by,)
@@ -174,10 +175,13 @@ class BaseIndex(DictRow):
         
     @buchtimer()
     def append(self, target):
-        # print 'ASKED TO APPEND'
+        # print 'ASKED TO APPEND', target
         # assert self._order_by == 'TimeUUIDType', 'Append makes no sense for sort order %s' % (self._order_by,)
-        if (self._default_field.value.unique and not self.is_unique(target)):
-            return self
+        # if (self._default_field.value.unique and not self.is_unique(target)):
+        #     return self
+
+        if target._beensaved:
+            print 'NOT STORING', self._column_family, target._column_family, target
         
         # print 'APPENDCODE', target, self._default_field
         assert isinstance(target, self._default_field.value.foreign_class), "Trying to store ForeignKeySpec of wrong type!"
