@@ -268,7 +268,8 @@ class BasicRow(RowDefaults):
             value = self.get_value_for_columnkey(column_key)
             
             # print 'WHXT', column_key, spec
-            if spec.config.get('private'):
+            if spec.config.get('private') and (not with_private):
+                print 'PRIVATE', with_private
                 continue
             
             if for_saving:
@@ -305,11 +306,11 @@ class BasicRow(RowDefaults):
             kwargs['access_mode'] = 'to_external'
         return self.yield_column_key_value_pairs(*args, **kwargs)
 
-    def toDICT(self, recurse=1, with_private=False):
+    def toDICT(self, recurse=1):
         data = {}
         if recurse >= 0:
             self.load()
-        for key, value in self.iteritems(with_row_key=True, with_private=with_private):
+        for key, value in self.iteritems(with_row_key=True):
             # print 'TRAVERSE', key, value
             if (key != self._row_key_name) and ( getattr(self.column_spec[key],'is_datetime',None)):
                 value = self.get(key, access_mode='to_identity')
@@ -344,7 +345,6 @@ class BasicRow(RowDefaults):
         tmp.update(*args, **kwargs)
         
         for column_key, value in tmp.iteritems():
-            # print column_key, value
             if column_key == 'row_key':
                 self.row_key = self._row_key_spec.to_internal(value)
                 continue
@@ -391,7 +391,7 @@ class BasicRow(RowDefaults):
     @staticmethod
     def get_slice_predicate(column_names=None, start='', finish='', reverse=False, count=20, *args, **kwargs):
         if column_names:
-            return SlicePredicate(column_names=columns)
+            return SlicePredicate(column_names=column_names)
             
         slice_range = SliceRange(start=start, finish=finish, reversed=reverse, count=count)
         return SlicePredicate(slice_range=slice_range)
@@ -533,7 +533,8 @@ class BasicRow(RowDefaults):
     def _real_save(self, save_row_key=None, *args, **kwargs):
         save_columns = []
         if not self.column_changed:
-            print 'NOT SAVING', self._column_family, self.column_changed
+            # print 'NOT SAVING', self._column_family, self.column_changed
+            return
         for column_key, value in self.yield_column_key_value_pairs(for_saving=True):
             assert isinstance(value, basestring), 'Not basestring %s:%s (%s)' % (column_key, type(value), type(self))
             newtimestamp = self._timestamp_func()
@@ -544,7 +545,7 @@ class BasicRow(RowDefaults):
             column = Column(name=column_key, value=value, clock=Clock(timestamp=newtimestamp))
             save_columns.append( ColumnOrSuperColumn(column=column) )
 
-        # print '_REAL_SAVE', self._column_family, save_row_key, save_columns
+        print '_REAL_SAVE', self._column_family, save_row_key, save_columns
         save_mutations = [Mutation(column_or_supercolumn=sc) for sc in save_columns]
                 
         # self.getclient().batch_insert(#keyspace         = str(self._keyspace),

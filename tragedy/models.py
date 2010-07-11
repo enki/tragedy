@@ -2,6 +2,7 @@ from .rows import DictRow
 from .columns import (ByteField, 
                       TimeField,
                       TimeSpec,
+                      UnicodeSpec,
                       TimeStampSpec,
                       ManualIndexField,
                       SecondaryIndexField,
@@ -70,17 +71,23 @@ class Model(DictRow):
                 default_key = getattr(value, 'default_key', None)
                 # print 'AUTOSETROW', cls._column_family, getattr(value, 'autosetrow')
                 autosetrow = getattr(value, 'autosetrow', False)
-                # order_by = getattr(value, 'order_by', 'TimeUUIDType')
+                order_by = getattr(value, 'order_by', 'TimeUUIDType')
+                if order_by == 'TimeUUIDType':
+                    defkeyspec = TimeStampSpec()
+                    defvalspec = ForeignKeySpec(foreign_class=default_field, unique=True)
+                elif order_by == 'BytesType':
+                    defkeyspec = UnicodeSpec()
+                    defvalspec = ForeignKeySpec(foreign_class=default_field, unique=True)
                 
                 class ManualIndexImplementation(BaseIndex):
                     _column_family = 'Auto_%s_%s' % (cls._column_family, key)
-                    _default_field = Field(key=TimeStampSpec(), 
-                                           value=ForeignKeySpec(foreign_class=default_field, unique=True))
+                    _default_field = Field(key=defkeyspec, 
+                                           value=defvalspec)
                     _index_name = key
                     _target_fieldname = target_fieldname
                     _default_key = default_key
                     _autosetrow = autosetrow
-                    # _order_by = order_by
+                    _order_by = order_by
                     _row_key_name = row_key_name
                     _generated = True
                     
@@ -181,7 +188,8 @@ class BaseIndex(DictRow):
         #     return self
 
         if target._beensaved:
-            print 'NOT STORING', self._column_family, target._column_family, target
+            # print 'NOT STORING', self._column_family, target._column_family, target
+            return self
         
         # print 'APPENDCODE', target, self._default_field
         assert isinstance(target, self._default_field.value.foreign_class), "Trying to store ForeignKeySpec of wrong type!"
@@ -200,8 +208,13 @@ class BaseIndex(DictRow):
         return itertools.izip(self.iterkeys(), self.loadIterValues())
 
     def loadIterValues(self):
-        if self.values():
-            return self._default_field.value.foreign_class.load_multi(keys=self.values()) #orderdata=self.keys())
+        vals = self.values()
+        if vals:
+            return self._default_field.value.foreign_class.load_multi(keys=vals) #orderdata=self.keys())
+            # if self._order_by == 'TimeUUIDType':
+            #     return self._default_field.value.foreign_class.load_multi(keys=vals) #orderdata=self.keys())
+            # else:
+            #     return vals
         return []
 
     def resolve(self):

@@ -78,6 +78,7 @@ class ManualIndexField(Field):
     def __init__(self, target_model, *args, **kwargs):
         self._target_model = target_model
         self.target_field = None
+        self.order_by = kwargs.pop('order_by', 'TimeUUIDType')
 
     def doresolve(self):
         if isinstance(self._target_model, basestring):
