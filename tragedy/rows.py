@@ -306,25 +306,30 @@ class BasicRow(RowDefaults):
             kwargs['access_mode'] = 'to_external'
         return self.yield_column_key_value_pairs(*args, **kwargs)
 
-    def toDICT(self, recurse=1):
+    def toDICT(self, recurse=1, fields=None):
         data = {}
         if recurse >= 0:
             self.load()
         for key, value in self.iteritems(with_row_key=True):
-            # print 'TRAVERSE', key, value
+            if fields and (key not in fields):
+                continue
+            
             if (key != self._row_key_name) and ( getattr(self.column_spec[key],'is_datetime',None)):
                 value = self.get(key, access_mode='to_identity')
             
             if hasattr(value, 'toDICT'):
                 if recurse >= 0:
-                    value = value.toDICT(recurse=recurse - 1)
+                    childfields = None
+                    if hasattr(fields,'get'):
+                        childfields = fields.get(key)
+                    value = value.toDICT(recurse=recurse - 1, fields=childfields)
                 else:
                     value = {}
             data[key] = value
         return data
 
-    def toJSON(self, recurse=1):
-        data = self.toDICT(recurse=recurse)
+    def toJSON(self, recurse=1, fields=None):
+        data = self.toDICT(recurse=recurse, fields=fields)
         return jsondumps(data)
 
 # ----- Change Data -----
