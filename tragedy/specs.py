@@ -6,7 +6,7 @@ from .util import jsondumps, jsonloads
 from .exceptions import TragedyException
 from .hierarchy import cmcache
 
-import myuuid as uuid # FIXME: this reverses the timestamp order - probably a really bad idea.
+from .util import uuid
 
 class Spec(object):
     default = False

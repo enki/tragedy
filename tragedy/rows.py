@@ -394,11 +394,11 @@ class BasicRow(RowDefaults):
         return d
     
     @staticmethod
-    def get_slice_predicate(column_names=None, start='', finish='', reverse=False, count=20, *args, **kwargs):
+    def get_slice_predicate(column_names=None, start='', finish='', reversed=True, count=20, *args, **kwargs):
         if column_names:
             return SlicePredicate(column_names=column_names)
             
-        slice_range = SliceRange(start=start, finish=finish, reversed=reverse, count=count)
+        slice_range = SliceRange(start=start, finish=finish, reversed=reversed, count=count)
         return SlicePredicate(slice_range=slice_range)
     
     @staticmethod
@@ -545,7 +545,8 @@ class BasicRow(RowDefaults):
             newtimestamp = self._timestamp_func()
             import time
             foo = self.get_spec_for_columnkey(column_key)
-            # print 'STORING WITH NEWTIMESTAMP', save_row_key, self.__class__._column_family, repr(column_key), foo.key, value, newtimestamp #time.ctime( int(newtimestamp) ) 
+            # print 'STORING WITH NEWTIMESTAMP', save_row_key, self.__class__._column_family, repr(column_key), foo.key, value, newtimestamp, time.ctime( int(newtimestamp) ) 
+            print 'TIMESTAMP', int(newtimestamp)
             # print 'OPHAI', column_key
             column = Column(name=column_key, value=value, clock=Clock(timestamp=newtimestamp))
             save_columns.append( ColumnOrSuperColumn(column=column) )

@@ -57,11 +57,11 @@ class Tweet(Model):
 
 twitty_keyspace.connect(servers=['localhost:9160'], auto_create_models=True, auto_drop_keyspace=True)
 
-for i in range(0,20):
+for i in range(0,1000):
     Tweet(uuid='HAI%d' % (i,), message='whocares').save()
     # print Tweet.alltweets().load()
 
-print Tweet.alltweets().load()
+print Tweet.alltweets().load(count=50, reversed=True)
 # 
 # dave = User(username='dave', firstname='dave', password='test').save()
 # bood = User(username='dave', firstname='dave', lastname='Bood', password='super').save()

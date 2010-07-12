@@ -10,7 +10,7 @@ from .columns import (ByteField,
                       Field,
                       RowKeySpec,
                      )
-from . import myuuid as uuid
+from . util import uuid
 from .exceptions import TragedyException
 
 from .hierarchy import cmcache
