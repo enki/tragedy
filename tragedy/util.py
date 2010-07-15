@@ -9,8 +9,8 @@ import datetime
 import datetime_safe
 CASPATHSEP = ' -> '
 
-# import myuuid as uuid # FIXME: this reverses the timestamp order - probably a really bad idea.
-import uuid
+import myuuid as uuid # FIXME: this reverses the timestamp order - probably a really bad idea.
+# import uuid
 
 class DjangoJSONEncoder(simplejson.JSONEncoder):
     """

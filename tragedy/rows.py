@@ -3,7 +3,7 @@ import itertools
 import uuid
 from cassandra.ttypes import (Column, Clock, ColumnOrSuperColumn, ColumnParent,
     ColumnPath, ConsistencyLevel, NotFoundException, SlicePredicate,
-    SliceRange, SuperColumn, CfDef, Mutation)
+    SliceRange, SuperColumn, CfDef, Mutation, Deletion)
 
 from .datastructures import (OrderedSet,
                              OrderedDict,
@@ -372,13 +372,13 @@ class BasicRow(RowDefaults):
         if column_key in self.column_changed:
             del self.column_changed[column_key]
 
-    def delete(self, column_key):
-        # XXX: keep track of delete
-        # XXX: can't delete if default columnspec is 'mandatory'.
-        spec = self.get_spec_for_columnkey(column_key)
-        if spec.mandatory:
-            raise TragedyException('Trying to delete mandatory column %s' % (column_key,))
-        del self.column_values[column_key]
+    # def delete(self, column_key):
+    #     # XXX: keep track of delete
+    #     # XXX: can't delete if default columnspec is 'mandatory'.
+    #     spec = self.get_spec_for_columnkey(column_key)
+    #     if spec.mandatory:
+    #         raise TragedyException('Trying to delete mandatory column %s' % (column_key,))
+    #     del self.column_values[column_key]
 
 # ----- Load Data -----
 
@@ -394,7 +394,7 @@ class BasicRow(RowDefaults):
         return d
     
     @staticmethod
-    def get_slice_predicate(column_names=None, start='', finish='', reversed=True, count=20, *args, **kwargs):
+    def get_slice_predicate(column_names=None, start='', finish='', reversed=False, count=20, *args, **kwargs):
         if column_names:
             return SlicePredicate(column_names=column_names)
             
@@ -405,6 +405,25 @@ class BasicRow(RowDefaults):
     def decodeColumn(colOrSuper):
         # print 'DECODE', colOrSuper.column.name, colOrSuper.column.clock
         return (colOrSuper.column.name, colOrSuper.column.value)
+    
+    @buchtimer()
+    def delete(self, **kwargs):
+        if not kwargs.get('write_consistency_level'):
+            kwargs['write_consistency_level'] = None
+        
+        sp = self.get_slice_predicate(**kwargs)
+        newtimestamp = self._timestamp_func()
+        clock=Clock(timestamp=newtimestamp)
+        deletion = Deletion(clock=clock, predicate=sp)
+        delmutation = Mutation(deletion=deletion)
+        
+        mumap = {self.row_key: {self._column_family: [delmutation]} }
+        # print mumap
+        self.getclient().batch_mutate(
+                                      mutation_map=mumap,
+                                      consistency_level=self._wcl(kwargs['write_consistency_level']),
+                                     )
+        
     
     @classmethod
     @buchtimer()    
@@ -546,12 +565,12 @@ class BasicRow(RowDefaults):
             import time
             foo = self.get_spec_for_columnkey(column_key)
             # print 'STORING WITH NEWTIMESTAMP', save_row_key, self.__class__._column_family, repr(column_key), foo.key, value, newtimestamp, time.ctime( int(newtimestamp) ) 
-            print 'TIMESTAMP', int(newtimestamp)
+            # print 'TIMESTAMP', int(newtimestamp)
             # print 'OPHAI', column_key
             column = Column(name=column_key, value=value, clock=Clock(timestamp=newtimestamp))
             save_columns.append( ColumnOrSuperColumn(column=column) )
 
-        print '_REAL_SAVE', self._column_family, save_row_key, save_columns
+        # print '_REAL_SAVE', self._column_family, save_row_key, save_columns
         save_mutations = [Mutation(column_or_supercolumn=sc) for sc in save_columns]
                 
         # self.getclient().batch_insert(#keyspace         = str(self._keyspace),
@@ -560,6 +579,7 @@ class BasicRow(RowDefaults):
         #                          consistency_level= self._wcl(kwargs['write_consistency_level']),
         #                         )
         mumap = {save_row_key: {self._column_family: save_mutations} }
+        # print 'WHUT', mumap
         # print u'PREMUMAP', unicode(save_mutations).encode('ascii', 'replace')
         # print u'MUMAP', repr(mumap).encode('ascii', 'replace')
         self.getclient().batch_mutate(

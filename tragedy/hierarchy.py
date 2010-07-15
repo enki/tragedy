@@ -136,7 +136,7 @@ class Keyspace(object):
                 print 'Dropping %s...' % (cf,)     
                 client.system_drop_column_family(model._keyspace.name, cf)
             mykeyspace = client.describe_keyspace(model._keyspace.name)
-        print model._column_family, model._keyspace
+        # print model._column_family, model._keyspace
         if not model._column_family in mykeyspace.keys():
             print "Cassandra doesn't know about ColumnFamily '%s'." % (model._column_family,)
             if kwargs['auto_create_models']:

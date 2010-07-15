@@ -186,14 +186,15 @@ class BaseIndex(DictRow):
         # assert self._order_by == 'TimeUUIDType', 'Append makes no sense for sort order %s' % (self._order_by,)
         # if (self._default_field.value.unique and not self.is_unique(target)):
         #     return self
-
-        if target._beensaved:
-            # print 'NOT STORING', self._column_family, target._column_family, target
-            return self
+        
+        if not isinstance(target, basestring):
+            if target._beensaved:
+                # print 'NOT STORING', self._column_family, target._column_family, target
+                return self
+            if isinstance(target, self._default_field.value.foreign_class): #, "Trying to store ForeignKeySpec of wrong type!"
+                target = self._default_field.value.to_internal(target)
         
         # print 'APPENDCODE', target, self._default_field
-        assert isinstance(target, self._default_field.value.foreign_class), "Trying to store ForeignKeySpec of wrong type!"
-        target = self._default_field.value.to_internal(target)
         # print 'SUPERTARGET', target, self._default_field.value.foreign_class, self._default_field.value_to_display(target)
                 
         column_key = self.get_next_column_key()
