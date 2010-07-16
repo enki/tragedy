@@ -60,6 +60,7 @@ class Keyspace(object):
 
     def connect(self, *args, **kwargs):
         newkwargs = popmulti(kwargs, *possible_validate_args )
+        kwargs['framed_transport'] = True
         self._client = connection.connect(*args, **kwargs)
         
         for model in self.models.values():
