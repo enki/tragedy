@@ -411,19 +411,24 @@ class BasicRow(RowDefaults):
         if not kwargs.get('write_consistency_level'):
             kwargs['write_consistency_level'] = None
         
-        sp = self.get_slice_predicate(**kwargs)
-        newtimestamp = self._timestamp_func()
+        newtimestamp = self._timestamp_func()    
         clock=Clock(timestamp=newtimestamp)
-        deletion = Deletion(clock=clock, predicate=sp)
-        delmutation = Mutation(deletion=deletion)
+
+        if kwargs.get('column_names'):
+            print 'DELETE WITH COLUMN NAMES', kwargs.get('column_names')
+            sp = self.get_slice_predicate(**kwargs)
+            deletion = Deletion(clock=clock, predicate=sp)
+            delmutation = Mutation(deletion=deletion)
         
-        mumap = {self.row_key: {self._column_family: [delmutation]} }
-        # print mumap
-        self.getclient().batch_mutate(
-                                      mutation_map=mumap,
-                                      consistency_level=self._wcl(kwargs['write_consistency_level']),
-                                     )
-        
+            mumap = {self.row_key: {self._column_family: [delmutation]} }
+            print 'DELMUMAP', mumap
+            self.getclient().batch_mutate(
+                                          mutation_map=mumap,
+                                          consistency_level=self._wcl(kwargs['write_consistency_level']),
+                                         )
+        else:
+            cp = ColumnPath(column_family=self._column_family)
+            self.getclient().remove(self.row_key, cp, clock, self._wcl(kwargs['write_consistency_level']))
     
     @classmethod
     @buchtimer()    

@@ -18,6 +18,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 import socket
+import time
 import threading
 from Queue import Queue
 
@@ -28,6 +29,7 @@ from thrift.transport import TTransport
 from thrift.transport import TSocket
 from thrift.protocol import TBinaryProtocol
 from cassandra import Cassandra
+from cassandra.ttypes import InvalidRequestException
 
 from .util import unhandled_exception_handler
 from .exceptions import NoServerAvailable
@@ -136,7 +138,19 @@ class SingleConnection(object):
             if self._client is None:
                 self._find_server()
             try:
-                return getattr(self._client, attr)(*args, **kwargs)
+                timer = 0.1
+                def trycall():
+                    try:
+                        return getattr(self._client, attr)(*args, **kwargs)
+                    except InvalidRequestException:
+                        self.__getattr__('set_keyspace')(self._keyspace_set)
+                        time.sleep(timer)
+                        if timer < 15:
+                            timer *= 2
+                        else: 
+                            raise NoServerAvailable()
+                        return trycall()
+                return trycall()    
             except (Thrift.TException, socket.timeout, socket.error), exc:
                 unhandled_exception_handler()
                 # Connection error, try to connect to all the servers
