@@ -117,13 +117,17 @@ class Model(DictRow):
                         # print 'WORKING WITH', cls._column_family, cls._target_fieldname, default_key
                         
                         if default_key:
-                            cls(default_key).append(instance).save()
+                            tmp = cls(default_key)
+                            tmp.append(instance)
+                            tmp.save()
                         else:
                             seckey = instance.get(cls._target_fieldname)
                             mandatory = getattr(getattr(instance, cls._target_fieldname), 'mandatory', False)
                             print 'FINAL KEY', seckey
                             if seckey:
-                                cls( seckey ).append(instance).save()
+                                tmp = cls( seckey )
+                                tmp.append(instance)
+                                tmp.save()
                                 # print 'WHOA SAVED', cls(seckey).load()
                             elif (not seckey) and mandatory:
                                 raise TragedyException('Mandatory Secondary Field %s not present!' % (cls._target_fieldname,))
@@ -203,7 +207,7 @@ class BaseIndex(DictRow):
         # self.load()
         # print 'APPEND', self, target
         self._update( [(column_key, target)] )
-        return self
+        return column_key
 
     def loadIterItems(self):
         return itertools.izip(self.iterkeys(), self.loadIterValues())

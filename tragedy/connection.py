@@ -138,19 +138,20 @@ class SingleConnection(object):
             if self._client is None:
                 self._find_server()
             try:
-                timer = 0.1
-                def trycall():
+                def trycall(timer):
                     try:
                         return getattr(self._client, attr)(*args, **kwargs)
                     except InvalidRequestException:
+                        import traceback
+                        traceback.print_exc()
                         self.__getattr__('set_keyspace')(self._keyspace_set)
                         time.sleep(timer)
                         if timer < 15:
                             timer *= 2
                         else: 
                             raise NoServerAvailable()
-                        return trycall()
-                return trycall()    
+                        return trycall(timer)
+                return trycall(0.1)    
             except (Thrift.TException, socket.timeout, socket.error), exc:
                 unhandled_exception_handler()
                 # Connection error, try to connect to all the servers
