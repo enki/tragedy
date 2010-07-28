@@ -7,5 +7,5 @@
 from thrift.Thrift import *
 from ttypes import *
 
-VERSION = "8.3.0"
+VERSION = "9.0.0"
 
