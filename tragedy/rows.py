@@ -93,7 +93,7 @@ class RowDefaults(object):
     @classmethod
     def asCfDef(cls):
         assert cls._order_by in known_sort_orders, 'Unknown sort_by %s' % (cls._order_by,)
-        cfdef = CfDef(table=cls._keyspace.name, name=cls._column_family, column_type=cls._column_type, 
+        cfdef = CfDef(keyspace=cls._keyspace.name, name=cls._column_family, column_type=cls._column_type, 
                       comparator_type=cls._order_by, comment=cls._comment,
                       row_cache_size=cls._row_cache_size, preload_row_cache=cls._preload_row_cache, key_cache_size=cls._key_cache_size,
                       )
