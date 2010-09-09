@@ -53,7 +53,8 @@ class Keyspace(object):
         self._first_iteration_in_this_cycle = False
         cluster.registerKeyspace(self.name, self)
         
-        self.strategy_class = 'org.apache.cassandra.locator.RackUnawareStrategy'
+        self.strategy_class = 'org.apache.cassandra.locator.SimpleStrategy'
+        self.strategy_options = None
         self.replication_factor = 1
         
         cmcache.append('keyspaces', self)
@@ -70,7 +71,7 @@ class Keyspace(object):
             self.verify_datamodel(**newkwargs)
             
         if not self._client._keyspace_set:
-            self._client.set_keyspace(self.name)
+            self._client.set_keyspace(keyspace=self.name)
 
     def getclient(self):
         assert self._client, "Keyspace doesn't have a connection."
@@ -88,6 +89,7 @@ class Keyspace(object):
 
     def register_keyspace_with_cassandra(self):
         ksdef = KsDef(name=self.name, strategy_class=self.strategy_class,
+                      strategy_options=self.strategy_options,
                       replication_factor=self.replication_factor,
                       cf_defs=[x.asCfDef() for x in self.models.values()], # XXX: create columns at the same time
                      )
@@ -113,11 +115,11 @@ class Keyspace(object):
         allkeyspaces = client.describe_keyspaces()
         if first_iteration and model._keyspace.name in allkeyspaces and kwargs['auto_drop_keyspace']:
             print 'Autodropping keyspace %s...' % (model._keyspace,)
-            client.set_keyspace(model._keyspace.name) # this op requires auth
-            client.system_drop_keyspace(model._keyspace.name)            
+            client.set_keyspace(keyspace=model._keyspace.name) # this op requires auth
+            client.system_drop_keyspace(keyspace=model._keyspace.name)            
             allkeyspaces = client.describe_keyspaces()
-            
-        if not model._keyspace.name in allkeyspaces:
+        
+        if not model._keyspace.name in [x.name for x in allkeyspaces]:
             print "Cassandra doesn't know about keyspace %s (only %s)" % (model._keyspace, repr(tuple(allkeyspaces))[1:-1])
             if kwargs['auto_create_models']:
                 print 'Creating keyspace %s...' % (model._keyspace,)
@@ -137,17 +139,17 @@ class Keyspace(object):
                 print 'Dropping %s...' % (cf,)     
                 client.system_drop_column_family(model._keyspace.name, cf)
             mykeyspace = client.describe_keyspace(model._keyspace.name)
-        # print model._column_family, model._keyspace
-        if not model._column_family in mykeyspace.keys():
+        print model._column_family, model._keyspace, mykeyspace
+        if not model._column_family in [x.name for x in mykeyspace.cf_defs]:
             print "Cassandra doesn't know about ColumnFamily '%s'." % (model._column_family,)
             if kwargs['auto_create_models']:
                 print 'Creating ColumnFamily %s...' % (model._column_family,)
                 model.register_columnfamiliy_with_cassandra()
                 mykeyspace = client.describe_keyspace(model._keyspace.name)            
-        mycf = mykeyspace[model._column_family]
-        remotecw = mycf['CompareWith'].rsplit('.',1)[1]
+        mycf = dict( [(x.name, x) for x in mykeyspace.cf_defs ] ).get(model._column_family, None)
+        # remotecw = mycf.comparator_type.rsplit('.',1)[1]
         
         # print "Cassandra thinks ColumnFamily '%s' is sorted by '%s'. Tragedy thinks it is '%s'." % (model._column_family, remotecw, model._order_by)
-        assert model._column_type == mycf['Type'], "Cassandra expects Column Type '%s' for ColumnFamily %s. Tragedy thinks it is '%s'." % (mycf['Type'], model._column_family, model._column_type)
-        remotecw = mycf['CompareWith'].rsplit('.',1)[1]
+        assert model._column_type == mycf.column_type, "Cassandra expects Column Type '%s' for ColumnFamily %s. Tragedy thinks it is '%s'." % (mycf['Type'], model._column_family, model._column_type)
+        remotecw = mycf.comparator_type.rsplit('.',1)[1]
         assert model._order_by == remotecw, "Cassandra thinks ColumnFamily '%s' is sorted by '%s'. Tragedy thinks it is '%s'." % (model._column_family, remotecw, model._order_by)
