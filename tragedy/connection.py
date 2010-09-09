@@ -144,8 +144,10 @@ class SingleConnection(object):
                     except InvalidRequestException:
                         import traceback
                         traceback.print_exc()
-                        self.__getattr__('set_keyspace')(self._keyspace_set)
+                        self._client = None
+                        self._find_server()
                         time.sleep(timer)
+                        self.__getattr__('set_keyspace')(self._keyspace_set)
                         if timer < 15:
                             timer *= 2
                         else: 

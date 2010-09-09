@@ -415,20 +415,24 @@ class BasicRow(RowDefaults):
         clock=Clock(timestamp=newtimestamp)
 
         if kwargs.get('column_names'):
-            print 'DELETE WITH COLUMN NAMES', kwargs.get('column_names')
+            print 'DELETE WITH COLUMN NAMES', kwargs.get('column_names'), kwargs
             sp = self.get_slice_predicate(**kwargs)
             deletion = Deletion(clock=clock, predicate=sp)
             delmutation = Mutation(deletion=deletion)
         
             mumap = {self.row_key: {self._column_family: [delmutation]} }
+            print 'PREFUCKER', self.load()
+            
             print 'DELMUMAP', mumap
             self.getclient().batch_mutate(
                                           mutation_map=mumap,
                                           consistency_level=self._wcl(kwargs['write_consistency_level']),
                                          )
+            print 'FUCKER', self.load()
         else:
             cp = ColumnPath(column_family=self._column_family)
             self.getclient().remove(self.row_key, cp, clock, self._wcl(kwargs['write_consistency_level']))
+            print 'FULLDELFUCKER', self.load()
     
     @classmethod
     @buchtimer()    
