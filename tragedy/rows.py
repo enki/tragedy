@@ -1,7 +1,7 @@
 import functools
 import itertools
 import uuid
-from cassandra.ttypes import (Column, Clock, ColumnOrSuperColumn, ColumnParent,
+from cassandra.ttypes import (Column, ColumnOrSuperColumn, ColumnParent,
     ColumnPath, ConsistencyLevel, NotFoundException, SlicePredicate,
     SliceRange, SuperColumn, CfDef, Mutation, Deletion)
 
@@ -412,16 +412,15 @@ class BasicRow(RowDefaults):
             kwargs['write_consistency_level'] = None
         
         newtimestamp = self._timestamp_func()    
-        clock=Clock(timestamp=newtimestamp)
 
         if kwargs.get('column_names'):
             print 'DELETE WITH COLUMN NAMES', kwargs.get('column_names'), kwargs
             sp = self.get_slice_predicate(**kwargs)
-            deletion = Deletion(clock=clock, predicate=sp)
+            deletion = Deletion(timestamp=newtimestamp, predicate=sp)
             delmutation = Mutation(deletion=deletion)
         
             mumap = {self.row_key: {self._column_family: [delmutation]} }
-            print 'PREFUCKER', self.load()
+            # print 'PREFUCKER', self.load()
             
             print 'DELMUMAP', mumap
             self.getclient().batch_mutate(
@@ -431,7 +430,7 @@ class BasicRow(RowDefaults):
             print 'FUCKER', self.load()
         else:
             cp = ColumnPath(column_family=self._column_family)
-            self.getclient().remove(self.row_key, cp, clock, self._wcl(kwargs['write_consistency_level']))
+            self.getclient().remove(self.row_key, cp, newtimestamp, self._wcl(kwargs['write_consistency_level']))
             print 'FULLDELFUCKER', self.load()
     
     @classmethod
@@ -453,7 +452,10 @@ class BasicRow(RowDefaults):
         
         # print 'LOADMULTI', kwargs['keys']
         
+        # print 'GOING THROUGH', args, kwargs
+        
         for row_key, columns in cls.multiget_slice(*args, **kwargs):
+            # print 'ANSWERS', row_key, columns
             columns = OrderedDict(columns)
             columns['row_key'] = row_key
             columns['access_mode'] = 'to_identity'
@@ -467,6 +469,7 @@ class BasicRow(RowDefaults):
             raise StopIteration
             
         for row_key in kwargs['keys']:
+            # print 'AHAH', row_key, unordered
             blah = unordered.get(row_key)
             # print 'WHUT', blah, blah.pop(cls._row_key_name, None)
             # print 'WHUT', blah, blah.pop('row_key', None)
@@ -576,7 +579,7 @@ class BasicRow(RowDefaults):
             # print 'STORING WITH NEWTIMESTAMP', save_row_key, self.__class__._column_family, repr(column_key), foo.key, value, newtimestamp, time.ctime( int(newtimestamp) ) 
             # print 'TIMESTAMP', int(newtimestamp)
             # print 'OPHAI', column_key
-            column = Column(name=column_key, value=value, clock=Clock(timestamp=newtimestamp))
+            column = Column(name=column_key, value=value, timestamp=newtimestamp)
             save_columns.append( ColumnOrSuperColumn(column=column) )
 
         # print '_REAL_SAVE', self._column_family, save_row_key, save_columns

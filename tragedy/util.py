@@ -40,12 +40,13 @@ jsonloads = cjson.decode
 
 def buchtimer(maxtime=0.2):
     def wrap1(func):
+        print 'Buchtimer: Wrapping %s' % (func,)
         def wrap2(*args,**kwargs):
             starttime = time.time()
             result = func(*args, **kwargs)
             timediff = time.time() - starttime
             if timediff > maxtime:
-                print 'Func %s took %s seconds (maxtime=%s).' % (func, timediff, maxtime)
+                print 'Buchtimer: Func %s took %s seconds (maxtime=%s).' % (func, timediff, maxtime)
             return result
         return wrap2
     return wrap1
