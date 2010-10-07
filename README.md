@@ -5,7 +5,7 @@ A high-level Cassandra Object Abstraction for Python.
 
 ## In Development Warning
 
-Tragedy currently only works with the latest Cassandra trunk checkouts (0.7). This code is already used in production, but still a moving target and expected to have bugs.
+This code is under heavy development and I currently can't maintain it because I need to ship the product actually using this. Sorry!
 
 ## Understanding Tragedy's Data Model
 
