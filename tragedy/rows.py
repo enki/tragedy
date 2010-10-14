@@ -422,16 +422,16 @@ class BasicRow(RowDefaults):
             mumap = {self.row_key: {self._column_family: [delmutation]} }
             # print 'PREFUCKER', self.load()
             
-            print 'DELMUMAP', mumap
+            # print 'DELMUMAP', mumap
             self.getclient().batch_mutate(
                                           mutation_map=mumap,
                                           consistency_level=self._wcl(kwargs['write_consistency_level']),
                                          )
-            print 'FUCKER', self.load()
+            # print 'FUCKER', self.load()
         else:
             cp = ColumnPath(column_family=self._column_family)
             self.getclient().remove(self.row_key, cp, newtimestamp, self._wcl(kwargs['write_consistency_level']))
-            print 'FULLDELFUCKER', self.load()
+            # print 'FULLDELFUCKER', self.load()
     
     @classmethod
     @buchtimer()    
