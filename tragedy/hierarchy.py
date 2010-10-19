@@ -151,10 +151,10 @@ class Keyspace(object):
         
         # print "Cassandra thinks ColumnFamily '%s' is sorted by '%s'. Tragedy thinks it is '%s'." % (model._column_family, remotecw, model._order_by)
         print 'MY CF', mycf, mycf.row_cache_size
-        mycf.row_cache_size = model._row_cache_size
-        mycf.preload_row_cache = model._preload_row_cache
-        mycf.key_cache_size = model._key_cache_size
-        client.system_update_column_family(mycf)
+        # mycf.row_cache_size = model._row_cache_size
+        # mycf.preload_row_cache = model._preload_row_cache
+        # mycf.key_cache_size = model._key_cache_size
+        # client.system_update_column_family(mycf)
         
         assert model._column_type == mycf.column_type, "Cassandra expects Column Type '%s' for ColumnFamily %s. Tragedy thinks it is '%s'." % (mycf['Type'], model._column_family, model._column_type)
         remotecw = mycf.comparator_type.rsplit('.',1)[1]
