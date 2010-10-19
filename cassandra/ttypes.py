@@ -1890,6 +1890,9 @@ class CfDef(object):
    - max_compaction_threshold
    - row_cache_save_period_in_seconds
    - key_cache_save_period_in_seconds
+   - memtable_flush_after_mins
+   - memtable_throughput_in_mb
+   - memtable_operations_in_millions
   """
 
   thrift_spec = (
@@ -1914,9 +1917,12 @@ class CfDef(object):
     (18, TType.I32, 'max_compaction_threshold', None, None, ), # 18
     (19, TType.I32, 'row_cache_save_period_in_seconds', None, None, ), # 19
     (20, TType.I32, 'key_cache_save_period_in_seconds', None, None, ), # 20
+    (21, TType.I32, 'memtable_flush_after_mins', None, None, ), # 21
+    (22, TType.I32, 'memtable_throughput_in_mb', None, None, ), # 22
+    (23, TType.DOUBLE, 'memtable_operations_in_millions', None, None, ), # 23
   )
 
-  def __init__(self, keyspace=None, name=None, column_type=thrift_spec[3][4], comparator_type=thrift_spec[5][4], subcomparator_type=None, comment=None, row_cache_size=thrift_spec[9][4], preload_row_cache=thrift_spec[10][4], key_cache_size=thrift_spec[11][4], read_repair_chance=thrift_spec[12][4], column_metadata=None, gc_grace_seconds=None, default_validation_class=None, id=None, min_compaction_threshold=None, max_compaction_threshold=None, row_cache_save_period_in_seconds=None, key_cache_save_period_in_seconds=None,):
+  def __init__(self, keyspace=None, name=None, column_type=thrift_spec[3][4], comparator_type=thrift_spec[5][4], subcomparator_type=None, comment=None, row_cache_size=thrift_spec[9][4], preload_row_cache=thrift_spec[10][4], key_cache_size=thrift_spec[11][4], read_repair_chance=thrift_spec[12][4], column_metadata=None, gc_grace_seconds=None, default_validation_class=None, id=None, min_compaction_threshold=None, max_compaction_threshold=None, row_cache_save_period_in_seconds=None, key_cache_save_period_in_seconds=None, memtable_flush_after_mins=None, memtable_throughput_in_mb=None, memtable_operations_in_millions=None,):
     self.keyspace = keyspace
     self.name = name
     self.column_type = column_type
@@ -1935,6 +1941,9 @@ class CfDef(object):
     self.max_compaction_threshold = max_compaction_threshold
     self.row_cache_save_period_in_seconds = row_cache_save_period_in_seconds
     self.key_cache_save_period_in_seconds = key_cache_save_period_in_seconds
+    self.memtable_flush_after_mins = memtable_flush_after_mins
+    self.memtable_throughput_in_mb = memtable_throughput_in_mb
+    self.memtable_operations_in_millions = memtable_operations_in_millions
 
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
@@ -2041,6 +2050,21 @@ class CfDef(object):
           self.key_cache_save_period_in_seconds = iprot.readI32();
         else:
           iprot.skip(ftype)
+      elif fid == 21:
+        if ftype == TType.I32:
+          self.memtable_flush_after_mins = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 22:
+        if ftype == TType.I32:
+          self.memtable_throughput_in_mb = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 23:
+        if ftype == TType.DOUBLE:
+          self.memtable_operations_in_millions = iprot.readDouble();
+        else:
+          iprot.skip(ftype)
       else:
         iprot.skip(ftype)
       iprot.readFieldEnd()
@@ -2125,6 +2149,18 @@ class CfDef(object):
     if self.key_cache_save_period_in_seconds != None:
       oprot.writeFieldBegin('key_cache_save_period_in_seconds', TType.I32, 20)
       oprot.writeI32(self.key_cache_save_period_in_seconds)
+      oprot.writeFieldEnd()
+    if self.memtable_flush_after_mins != None:
+      oprot.writeFieldBegin('memtable_flush_after_mins', TType.I32, 21)
+      oprot.writeI32(self.memtable_flush_after_mins)
+      oprot.writeFieldEnd()
+    if self.memtable_throughput_in_mb != None:
+      oprot.writeFieldBegin('memtable_throughput_in_mb', TType.I32, 22)
+      oprot.writeI32(self.memtable_throughput_in_mb)
+      oprot.writeFieldEnd()
+    if self.memtable_operations_in_millions != None:
+      oprot.writeFieldBegin('memtable_operations_in_millions', TType.DOUBLE, 23)
+      oprot.writeDouble(self.memtable_operations_in_millions)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()
